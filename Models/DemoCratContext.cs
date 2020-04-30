@@ -483,8 +483,6 @@ namespace ShopCart.Models
 
                 entity.Property(e => e.OrderIdV).HasColumnName("order_id_v");
 
-                entity.Property(e => e.PaymentId).HasColumnName("payment_id");
-
                 entity.Property(e => e.Status).HasColumnName("status");
 
                 entity.Property(e => e.TotalPrice)
@@ -506,12 +504,6 @@ namespace ShopCart.Models
                     .HasForeignKey(d => d.AddressId)
                     .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("FK_order_tbl_address_tbl");
-
-                entity.HasOne(d => d.Payment)
-                    .WithMany(p => p.OrderTbl)
-                    .HasForeignKey(d => d.PaymentId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
-                    .HasConstraintName("FK_order_tbl_payment_tbl");
 
                 entity.HasOne(d => d.User)
                     .WithMany(p => p.OrderTbl)
@@ -535,6 +527,8 @@ namespace ShopCart.Models
 
                 entity.Property(e => e.IsDeleted).HasColumnName("is_deleted");
 
+                entity.Property(e => e.OrderId).HasColumnName("order_id");
+
                 entity.Property(e => e.Status).HasColumnName("status");
 
                 entity.Property(e => e.TransectionId)
@@ -552,6 +546,12 @@ namespace ShopCart.Models
                     .HasForeignKey(d => d.CardId)
                     .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("FK_payment_tbl_cards_tbl");
+
+                entity.HasOne(d => d.Order)
+                    .WithMany(p => p.PaymentTbl)
+                    .HasForeignKey(d => d.OrderId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("FK_payment_tbl_order_tbl");
             });
 
             modelBuilder.Entity<ProductImg>(entity =>

@@ -8,6 +8,7 @@ namespace ShopCart.Models
         public OrderTbl()
         {
             OrderDetailsTbl = new HashSet<OrderDetailsTbl>();
+            PaymentTbl = new HashSet<PaymentTbl>();
             ReturnTbl = new HashSet<ReturnTbl>();
         }
 
@@ -18,7 +19,6 @@ namespace ShopCart.Models
         public decimal TotalPrice { get; set; }
         public int AddressId { get; set; }
         public string CouponCode { get; set; }
-        public int PaymentId { get; set; }
         public byte Status { get; set; }
         public DateTime CreateDt { get; set; }
         public DateTime UpdateDt { get; set; }
@@ -26,9 +26,9 @@ namespace ShopCart.Models
         public bool IsDeleted { get; set; }
 
         public AddressTbl Address { get; set; }
-        public PaymentTbl Payment { get; set; }
         public UserMstr User { get; set; }
         public ICollection<OrderDetailsTbl> OrderDetailsTbl { get; set; }
+        public ICollection<PaymentTbl> PaymentTbl { get; set; }
         public ICollection<ReturnTbl> ReturnTbl { get; set; }
     }
 }

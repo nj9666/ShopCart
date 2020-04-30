@@ -41,10 +41,10 @@ namespace ShopCart.Controllers
             InputData objInput = new InputData();
             try
             {
-                if (_dbContext.UserMstr.Where(p => p.ContactNumber == objUserData.ContactNumber).Any())
+                if (_dbContext.UserMstr.Where(p => p.ContactNumber == objUserData.ContactNumber || p.Email == objUserData.Email).Any())
                 {
                     objInput.success = false;
-                    objInput.message = "Phone Number already register!!";
+                    objInput.message = "Phone Number or Email already register!!";
                     objInput.Data = null;
                 }
                 else
@@ -96,10 +96,60 @@ namespace ShopCart.Controllers
             return Ok(objHttpCommonResponse);
         }
 
+        [HttpPost]
+        [Route("User/Login")]
+        public dynamic User_Login([FromBody]UserMstr objUserData)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                var Data = _dbContext.UserMstr.Where(p => (p.UserName == objUserData.UserName || p.ContactNumber == Decimal.Parse(objUserData.UserName)) && p.Password == objUserData.Password).ToList();
+
+                if (Data.Count == 0)
+                {
+                    objInput.success = false;
+                    objInput.message = "Incorrect Password.";
+                    objInput.Data = null;
+                }
+                else
+                {
+                    if (Data[0].IsActive)
+                    {
+                        DateTime tomorrow = DateTime.UtcNow.AddHours(24);
+                        string xToken = Data[0].Id.ToString() + "#" + Data[0].UserName + "#" + tomorrow.ToString();
+
+                        objInput.success = true;
+                        objInput.message = "Successfully.";
+                        objInput.Data = Data;
+                        objInput.AuthToken = Encrypt(xToken);
+                    }
+                    else
+                    {
+                        objInput.success = false;
+                        objInput.message = "This user is currently deactivate.";
+                        objInput.Data = null;
+                    }
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            objHttpCommonResponse.AuthToken = objInput.AuthToken;
+            return Ok(objHttpCommonResponse);
+        }
+
 
         [HttpPost]
         [Route("User/Edit/{UserId}")]
-        public dynamic User_Edit([FromBody]UserMstr objUserData,int UserId)
+        public dynamic User_Edit([FromBody]UserMstr objUserData, int UserId)
         {
             InputData objInput = new InputData();
             try
@@ -165,7 +215,7 @@ namespace ShopCart.Controllers
 
 
 
-        #region card Area
+        #region User Activity Area
 
         [HttpPost]
         [Route("Card/Insert")]
@@ -220,7 +270,7 @@ namespace ShopCart.Controllers
 
         [HttpPost]
         [Route("Card/Edit/{CardId}")]
-        public dynamic Card_Edit([FromBody]CardsTbl objCardsData,int CardId)
+        public dynamic Card_Edit([FromBody]CardsTbl objCardsData, int CardId)
         {
             InputData objInput = new InputData();
             try
@@ -284,7 +334,7 @@ namespace ShopCart.Controllers
                     objInput.message = "Cards is ont Exist!!";
                     objInput.Data = null;
                 }
-                
+
                 else
                 {
                     CardsTbl objCardsData = _dbContext.CardsTbl.Find(CardId);
@@ -333,7 +383,7 @@ namespace ShopCart.Controllers
                 else
                 {
                     CardsTbl objCardsData = _dbContext.CardsTbl.Find(CardId);
-                   
+
                     //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
                     //String xToken = objCardsData.Id.ToString() + "#" + objCardsData.UserName + "#" + tomorrow.ToString();
                     //objInput.AuthToken = Encrypt(xToken);
@@ -417,7 +467,7 @@ namespace ShopCart.Controllers
                 }
                 else
                 {
-                    CardsTbl objCardsData = _dbContext.CardsTbl.Where(p => p.UserId == UserId &&  p.IsDefault == true).FirstOrDefault();
+                    CardsTbl objCardsData = _dbContext.CardsTbl.Where(p => p.UserId == UserId && p.IsDefault == true).FirstOrDefault();
 
                     //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
                     //String xToken = objCardsData.Id.ToString() + "#" + objCardsData.UserName + "#" + tomorrow.ToString();
@@ -743,7 +793,7 @@ namespace ShopCart.Controllers
                     List<AddressTbl> objAddresssList = _dbContext.AddressTbl.Where(p => p.UserId == GetAuthId()).ToList();
                     foreach (AddressTbl add in objAddresssList)
                     {
-                        if(add.Id == AddressId)
+                        if (add.Id == AddressId)
                         {
                             add.IsDefault = true;
                             updatedadd = add;
@@ -849,6 +899,502 @@ namespace ShopCart.Controllers
             return Ok(objHttpCommonResponse);
         }
 
+
+        [HttpPost]
+        [Route("Cart/Qty/{CartId}/{Qty}")]
+        public dynamic Cart_Change_Qty(int CartId, int Qty)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+
+                int UserId = GetAuthId();
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+
+                if (!_dbContext.UserMstr.Where(p => p.Id == GetAuthId()).Any())
+                {
+                    objInput.success = false;
+                    objInput.message = "you are not able to this!!";
+                    objInput.Data = null;
+                }
+                else if (_dbContext.CardsTbl.Where(p => p.Id == CartId && p.UserId == UserId).Any())
+                {
+                    objInput.success = false;
+                    objInput.message = "Cart Item is not Exist!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+                    CartTbl objCartData = _dbContext.CartTbl.Find(CartId);
+                    objCartData.Qty = Qty;
+                    objCartData.UpdateDt = DateTime.UtcNow;
+                    _dbContext.SaveChanges();
+
+                    //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
+                    //String xToken = objAdminData.Id.ToString() + "#" + objAdminData.UserName + "#" + tomorrow.ToString();
+                    //objInput.AuthToken = Encrypt(xToken);
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = objCartData;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+            return Ok(objHttpCommonResponse);
+        }
+
+
+        [HttpPost]
+        [Route("Cart/Remove/{CartId}")]
+        public dynamic Cart_Remove(int CartId)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                int UserId = GetAuthId();
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+
+                if (!_dbContext.UserMstr.Where(p => p.Id == GetAuthId()).Any())
+                {
+                    objInput.success = false;
+                    objInput.message = "you are not able to this!!";
+                    objInput.Data = null;
+                }
+                else if (_dbContext.CardsTbl.Where(p => p.Id == CartId && p.UserId == UserId).Any())
+                {
+                    objInput.success = false;
+                    objInput.message = "Cart Item is not Exist!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+                    CartTbl objCartData = _dbContext.CartTbl.Find(CartId);
+                    _dbContext.CartTbl.Remove(objCartData);
+                    _dbContext.SaveChanges();
+
+                    //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
+                    //String xToken = objAdminData.Id.ToString() + "#" + objAdminData.UserName + "#" + tomorrow.ToString();
+                    //objInput.AuthToken = Encrypt(xToken);
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = objCartData;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+            return Ok(objHttpCommonResponse);
+        }
+
+        [HttpGet]
+        [Route("Cart/GetAll")]
+        public dynamic Cart_GetAll()
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                int UserId = GetAuthId();
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+
+                if (!_dbContext.UserMstr.Where(p => p.Id == GetAuthId()).Any())
+                {
+                    objInput.success = false;
+                    objInput.message = "you are not able to this!!";
+                    objInput.Data = null;
+                }
+                else if (!_dbContext.WishlistTbl.Where(p => p.UserId == UserId).Any())
+                {
+                    objInput.success = false;
+                    objInput.message = "Cart List is Empty!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+
+                    List<CartTbl> carts = _dbContext.CartTbl.Where(p => p.UserId == UserId).ToList();
+
+                    //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
+                    //String xToken = objAdminData.Id.ToString() + "#" + objAdminData.UserName + "#" + tomorrow.ToString();
+                    //objInput.AuthToken = Encrypt(xToken);
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = carts;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+            return Ok(objHttpCommonResponse);
+        }
+
+
+        [HttpPost]
+        [Route("Wish/Insert")]
+        public dynamic Wish_Insert([FromBody]WishlistTbl objWishData)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                int UserId = GetAuthId();
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+
+                if (!_dbContext.UserMstr.Where(p => p.Id == GetAuthId()).Any())
+                {
+                    objInput.success = false;
+                    objInput.message = "you are not able to this!!";
+                    objInput.Data = null;
+                }
+                else if (_dbContext.WishlistTbl.Where(p => p.SubProducatId == objWishData.SubProducatId && p.UserId == UserId).Any())
+                {
+                    objInput.success = false;
+                    objInput.message = "Alraedy Exist in Wish List!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+                    objWishData.IsActive = true;
+                    objWishData.IsDeleted = false;
+                    objWishData.CreateDt = DateTime.UtcNow;
+                    objWishData.UpdateDt = DateTime.UtcNow;
+                    _dbContext.WishlistTbl.Add(objWishData);
+                    _dbContext.SaveChanges();
+
+                    //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
+                    //String xToken = objAdminData.Id.ToString() + "#" + objAdminData.UserName + "#" + tomorrow.ToString();
+                    //objInput.AuthToken = Encrypt(xToken);
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = objWishData;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+            return Ok(objHttpCommonResponse);
+        }
+
+        [HttpPost]
+        [Route("Wish/Remove/{CartId}")]
+        public dynamic Wish_Remove(int WishId)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                int UserId = GetAuthId();
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+
+                if (!_dbContext.UserMstr.Where(p => p.Id == GetAuthId()).Any())
+                {
+                    objInput.success = false;
+                    objInput.message = "you are not able to this!!";
+                    objInput.Data = null;
+                }
+                else if (_dbContext.WishlistTbl.Where(p => p.Id == WishId && p.UserId == UserId).Any())
+                {
+                    objInput.success = false;
+                    objInput.message = "Cart Item is not Exist!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+                    WishlistTbl objWishData = _dbContext.WishlistTbl.Find(WishId);
+                    _dbContext.WishlistTbl.Remove(objWishData);
+                    _dbContext.SaveChanges();
+
+                    //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
+                    //String xToken = objAdminData.Id.ToString() + "#" + objAdminData.UserName + "#" + tomorrow.ToString();
+                    //objInput.AuthToken = Encrypt(xToken);
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = objWishData;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+            return Ok(objHttpCommonResponse);
+        }
+
+
+        [HttpGet]
+        [Route("Wish/GetAll")]
+        public dynamic Wish_GetAll()
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                int UserId = GetAuthId();
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+
+                if (!_dbContext.UserMstr.Where(p => p.Id == GetAuthId()).Any())
+                {
+                    objInput.success = false;
+                    objInput.message = "you are not able to this!!";
+                    objInput.Data = null;
+                }
+                else if (!_dbContext.WishlistTbl.Where(p => p.UserId == UserId).Any())
+                {
+                    objInput.success = false;
+                    objInput.message = "Wish List is Empty!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+
+                    List<WishlistTbl> wishlists = _dbContext.WishlistTbl.Where(p => p.UserId == UserId).ToList();
+
+                    //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
+                    //String xToken = objAdminData.Id.ToString() + "#" + objAdminData.UserName + "#" + tomorrow.ToString();
+                    //objInput.AuthToken = Encrypt(xToken);
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = wishlists;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+            return Ok(objHttpCommonResponse);
+        }
+
+
+
+        [HttpPost]
+        [Route("Order/Place")]
+        public dynamic Order_Place([FromBody]OrderTbl objOrderData)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                objOrderData.IsActive = true;
+                objOrderData.IsDeleted = false;
+                objOrderData.CreateDt = DateTime.UtcNow;
+                objOrderData.UpdateDt = DateTime.UtcNow;
+                _dbContext.OrderTbl.Add(objOrderData);
+
+                _dbContext.SaveChanges();
+
+                foreach (OrderDetailsTbl ODT in objOrderData.OrderDetailsTbl)
+                {
+                    ODT.OrderId = objOrderData.Id;
+                    ODT.IsActive = true;
+                    ODT.IsDeleted = false;
+                    ODT.CreateDt = DateTime.UtcNow;
+                    ODT.UpdateDt = DateTime.UtcNow;
+                    _dbContext.OrderDetailsTbl.Add(ODT);
+
+                    _dbContext.SaveChanges();
+                }
+
+
+
+                //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
+                //String xToken = objOrderData.Id.ToString() + "#" + objOrderData.UserName + "#" + tomorrow.ToString();
+                //objInput.AuthToken = Encrypt(xToken);
+                objInput.success = true;
+                objInput.message = "Successfully. ";
+                objInput.Data = objOrderData;
+
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+            return Ok(objHttpCommonResponse);
+        }
+
+
+
+        [HttpPost]
+        [Route("Rating/Insert")]
+        public dynamic Rating_Insert([FromBody]RatingTbl objRatingData)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                if (_dbContext.RatingTbl.Where(p => p.ProductId == objRatingData.ProductId && p.UserId == objRatingData.UserId).Any())
+                {
+                    objInput.success = false;
+                    objInput.message = "Rating is already register!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+
+                    objRatingData.IsActive = true;
+                    objRatingData.IsDeleted = false;
+                    objRatingData.CreateDt = DateTime.UtcNow;
+                    objRatingData.UpdateDt = DateTime.UtcNow;
+                    _dbContext.RatingTbl.Add(objRatingData);
+                    _dbContext.SaveChanges();
+
+                    //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
+                    //String xToken = objRatingData.Id.ToString() + "#" + objRatingData.UserName + "#" + tomorrow.ToString();
+                    //objInput.AuthToken = Encrypt(xToken);
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = objRatingData;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+            return Ok(objHttpCommonResponse);
+        }
+
+
+        [HttpPost]
+        [Route("Rating/Edit")]
+        public dynamic Rating_Edit([FromBody]RatingTbl objRatingData)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                int UserId = GetAuthId();
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+
+                if (!_dbContext.UserMstr.Where(p => p.Id == GetAuthId()).Any())
+                {
+                    objInput.success = false;
+                    objInput.message = "you are not able to this!!";
+                    objInput.Data = null;
+                }
+                else if(!_dbContext.RatingTbl.Where(p => p.Id == objRatingData.Id && p.UserId == UserId).Any())
+                {
+                    objInput.success = false;
+                    objInput.message = "Rating is Not Exist!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+                    RatingTbl newrating = _dbContext.RatingTbl.Find(objRatingData.Id);
+                    newrating.Rating = objRatingData.Rating;
+                    newrating.Review = objRatingData.Review;
+                    objRatingData.UpdateDt = DateTime.UtcNow;
+                    _dbContext.SaveChanges();
+
+                    //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
+                    //String xToken = objRatingData.Id.ToString() + "#" + objRatingData.UserName + "#" + tomorrow.ToString();
+                    //objInput.AuthToken = Encrypt(xToken);
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = objRatingData;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+            return Ok(objHttpCommonResponse);
+        }
 
         #endregion
 
@@ -1134,13 +1680,14 @@ namespace ShopCart.Controllers
                 {
                     return Unauthorized();
                 }
-                
+
                 if (!_dbContext.AdminMstr.Where(p => p.Id == GetAuthId()).Any())
                 {
                     objInput.success = false;
                     objInput.message = "you are not able to this!!";
                     objInput.Data = null;
-                }else if (_dbContext.CategoryMstr.Where(p => p.Name == objCategoryData.Name).Any())
+                }
+                else if (_dbContext.CategoryMstr.Where(p => p.Name == objCategoryData.Name).Any())
                 {
                     objInput.success = false;
                     objInput.message = "Category code is already register!!";
@@ -2173,7 +2720,7 @@ namespace ShopCart.Controllers
 
         #region vender Side Area
 
-        #region vender CRUD z
+        #region vender CRUD 
 
         [HttpPost]
         [Route("Vender/Insert")]
@@ -2182,7 +2729,7 @@ namespace ShopCart.Controllers
             InputData objInput = new InputData();
             try
             {
-                if (_dbContext.VenderMstr.Where(p => p.MobileNumber == objVenderData.MobileNumber).Any())
+                if (_dbContext.VenderMstr.Where(p => p.MobileNumber == objVenderData.MobileNumber || p.Email == objVenderData.Email).Any())
                 {
                     objInput.success = false;
                     objInput.message = "Vender MobileNumber is already register!!";
@@ -2216,6 +2763,56 @@ namespace ShopCart.Controllers
             objHttpCommonResponse.data = objInput.Data;
             return Ok(objHttpCommonResponse);
         }
+        [HttpPost]
+        [Route("Vender/Login")]
+        public dynamic Vender_Login([FromBody]VenderMstr objVenderData)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                var Data = _dbContext.VenderMstr.Where(p => (p.Email == objVenderData.Email || p.MobileNumber == Decimal.Parse(objVenderData.Email)) && p.Password == objVenderData.Password).ToList();
+
+                if (Data.Count == 0)
+                {
+                    objInput.success = false;
+                    objInput.message = "Incorrect Password.";
+                    objInput.Data = null;
+                }
+                else
+                {
+                    if (Data[0].IsActive)
+                    {
+                        DateTime tomorrow = DateTime.UtcNow.AddHours(24);
+                        string xToken = Data[0].Id.ToString() + "#" + Data[0].Email + "#" + tomorrow.ToString();
+
+                        objInput.success = true;
+                        objInput.message = "Successfully.";
+                        objInput.Data = Data;
+                        objInput.AuthToken = Encrypt(xToken);
+                    }
+                    else
+                    {
+                        objInput.success = false;
+                        objInput.message = "This user is currently deactivate.";
+                        objInput.Data = null;
+                    }
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            objHttpCommonResponse.AuthToken = objInput.AuthToken;
+            return Ok(objHttpCommonResponse);
+        }
+
 
         [HttpPost]
         [Route("Vender/Edit/{VenderId}")]
@@ -3015,25 +3612,19 @@ namespace ShopCart.Controllers
                     //(5 * 252 + 4 * 124 + 3 * 40 + 2 * 29 + 1 * 33) / (252 + 124 + 40 + 29 + 33) = 4.11 and change
 
                     ProductMstr newproduct = _dbContext.ProductMstr.Find(ProductId);
-                    newproduct.IsActive = false;
-                    newproduct.IsDeleted = true;
-                    newproduct.UpdateDt = DateTime.UtcNow;
+                    _dbContext.ProductMstr.Remove(newproduct);
                     _dbContext.SaveChanges();
 
 
                     foreach (SubProductTbl subProduct in _dbContext.SubProductTbl.Where(p => p.ProductId == newproduct.Id).ToList())
                     {
 
-                        subProduct.IsActive = false;
-                        subProduct.IsDeleted = true;
-                        subProduct.UpdateDt = DateTime.UtcNow;
+                        _dbContext.SubProductTbl.Remove(subProduct);
                         _dbContext.SaveChanges();
 
                         foreach (ProductImg pimg in _dbContext.ProductImg.Where(p => p.SubProducatId == subProduct.Id).ToList())
                         {
-                            pimg.IsActive = false;
-                            pimg.IsDeleted = true;
-                            pimg.UpdateDt = DateTime.UtcNow;
+                            _dbContext.ProductImg.Remove(pimg);
                             _dbContext.SaveChanges();
                         }
 
@@ -3076,7 +3667,7 @@ namespace ShopCart.Controllers
                     objInput.message = "Product is not Exist!!";
                     objInput.Data = null;
                 }
-              
+
 
                 else
                 {

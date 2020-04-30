@@ -5,12 +5,8 @@ namespace ShopCart.Models
 {
     public partial class PaymentTbl
     {
-        public PaymentTbl()
-        {
-            OrderTbl = new HashSet<OrderTbl>();
-        }
-
         public int Id { get; set; }
+        public int OrderId { get; set; }
         public byte Type { get; set; }
         public int CardId { get; set; }
         public string TransectionId { get; set; }
@@ -21,6 +17,6 @@ namespace ShopCart.Models
         public bool IsDeleted { get; set; }
 
         public CardsTbl Card { get; set; }
-        public ICollection<OrderTbl> OrderTbl { get; set; }
+        public OrderTbl Order { get; set; }
     }
 }
