@@ -11,6 +11,7 @@ namespace ShopCart.Models
             ProductMstr = new HashSet<ProductMstr>();
             SizesTbl = new HashSet<SizesTbl>();
             VanderBankDetailsTbl = new HashSet<VanderBankDetailsTbl>();
+            VenderPaymants = new HashSet<VenderPaymants>();
         }
 
         public int Id { get; set; }
@@ -41,5 +42,6 @@ namespace ShopCart.Models
         public ICollection<ProductMstr> ProductMstr { get; set; }
         public ICollection<SizesTbl> SizesTbl { get; set; }
         public ICollection<VanderBankDetailsTbl> VanderBankDetailsTbl { get; set; }
+        public ICollection<VenderPaymants> VenderPaymants { get; set; }
     }
 }

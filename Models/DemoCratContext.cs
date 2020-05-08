@@ -38,6 +38,7 @@ namespace ShopCart.Models
         public virtual DbSet<UserMstr> UserMstr { get; set; }
         public virtual DbSet<VanderBankDetailsTbl> VanderBankDetailsTbl { get; set; }
         public virtual DbSet<VenderMstr> VenderMstr { get; set; }
+        public virtual DbSet<VenderPaymants> VenderPaymants { get; set; }
         public virtual DbSet<WishlistTbl> WishlistTbl { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -1131,6 +1132,35 @@ namespace ShopCart.Models
                     .HasForeignKey(d => d.StateId)
                     .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("FK_vender_mstr_state_mstr");
+            });
+
+            modelBuilder.Entity<VenderPaymants>(entity =>
+            {
+                entity.ToTable("vender_paymants");
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("id")
+                    .ValueGeneratedNever();
+
+                entity.Property(e => e.Amount).HasColumnName("amount");
+
+                entity.Property(e => e.BankAccount)
+                    .HasColumnName("bankAccount")
+                    .HasColumnType("numeric(18, 0)");
+
+                entity.Property(e => e.NeftId).HasColumnName("neftId");
+
+                entity.Property(e => e.PaymantDate)
+                    .HasColumnName("paymantDate")
+                    .HasColumnType("datetime");
+
+                entity.Property(e => e.VenderId).HasColumnName("vender_id");
+
+                entity.HasOne(d => d.Vender)
+                    .WithMany(p => p.VenderPaymants)
+                    .HasForeignKey(d => d.VenderId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("FK_vender_paymants_vender_mstr");
             });
 
             modelBuilder.Entity<WishlistTbl>(entity =>
