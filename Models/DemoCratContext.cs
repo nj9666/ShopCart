@@ -46,7 +46,7 @@ namespace ShopCart.Models
             if (!optionsBuilder.IsConfigured)
             {
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. See http://go.microsoft.com/fwlink/?LinkId=723263 for guidance on storing connection strings.
-                optionsBuilder.UseSqlServer("Data Source=DESKTOP-5A3V7O6;Initial Catalog=DemoCrat;Persist Security Info=True;User ID=sa;Password=123;");
+                optionsBuilder.UseSqlServer("Data Source=DESKTOP-5A3V7O6;Initial Catalog=DummyShop;User ID=sa;Password=123");
             }
         }
 
