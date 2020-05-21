@@ -11,6 +11,7 @@ using Newtonsoft.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.IO;
+using ShopCart.Models.VModels;
 
 namespace ShopCart.Controllers
 {
@@ -208,6 +209,41 @@ namespace ShopCart.Controllers
             return Ok(objHttpCommonResponse);
         }
 
+        [HttpGet]
+        [Route("User/GetAll")]
+        public dynamic User_GetAll()
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                if (_dbContext.UserMstr.Count() <= 0)
+                {
+                    objInput.success = false;
+                    objInput.message = "User is not avalable!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+                    List<UserMstr> dbUser = _dbContext.UserMstr.ToList();
+
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = dbUser;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            return Ok(objHttpCommonResponse);
+        }
 
 
 
@@ -1617,19 +1653,26 @@ namespace ShopCart.Controllers
         [Route("Adimn/Login")]
         public dynamic Adimn_Login([FromBody]AdminMstr objAdminData)
         {
-            InputData objInput = new InputData();
+            InputloginData objInput = new InputloginData();
             try
             {
                 //AdminMstr UpdateObj = _dbContext.AdminMstr.Single(p => p.ContactNumber == objAdminData.ContactNumber);
                 //UpdateObj.Token = objUserData.noti_token;
                 //_SellerProductContext.SaveChanges();
-
-                var Data = _dbContext.AdminMstr.Where(p => (p.UserName == objAdminData.UserName || p.ContactNumber == Decimal.Parse(objAdminData.UserName)) && p.Password == objAdminData.Password).ToList();
-
+                var Data = new List<AdminMstr>();
+                if (decimal.TryParse(objAdminData.UserName, out _))
+                {
+                    Data = _dbContext.AdminMstr.Where(p => (p.ContactNumber == Decimal.Parse(objAdminData.UserName)) && p.Password == objAdminData.Password).ToList();
+                }
+                else
+                {
+                    Data = _dbContext.AdminMstr.Where(p => (p.UserName == objAdminData.UserName) && p.Password == objAdminData.Password).ToList();
+                }
+                
                 if (Data.Count == 0)
                 {
-                    objInput.success = false;
-                    objInput.message = "Incorrect Password.";
+                    objInput.status = false;
+                    objInput.message = "Username password miss match.";
                     objInput.Data = null;
                 }
                 else
@@ -1639,14 +1682,14 @@ namespace ShopCart.Controllers
                         DateTime tomorrow = DateTime.UtcNow.AddHours(24);
                         string xToken = Data[0].Id.ToString() + "#" + Data[0].UserName + "#" + tomorrow.ToString();
 
-                        objInput.success = true;
-                        objInput.message = "Successfully.";
-                        objInput.Data = Data;
-                        objInput.AuthToken = Encrypt(xToken);
+                        objInput.status = true;
+                        objInput.message = "User Found Successfully.";
+                        objInput.Data = Data[0];
+                        objInput.token = Encrypt(xToken);
                     }
                     else
                     {
-                        objInput.success = false;
+                        objInput.status = false;
                         objInput.message = "This user is currently deactivate.";
                         objInput.Data = null;
                     }
@@ -1655,19 +1698,18 @@ namespace ShopCart.Controllers
             }
             catch (Exception ex)
             {
-                objInput.success = false;
+                objInput.status = false;
                 objInput.message = "Something went wrong, please contact support";
                 objInput.Data = null;
             }
 
-            objHttpCommonResponse.success = objInput.success;
-            objHttpCommonResponse.message = objInput.message;
-            objHttpCommonResponse.data = objInput.Data;
-            objHttpCommonResponse.AuthToken = objInput.AuthToken;
-            return Ok(objHttpCommonResponse);
+            //objHttpCommonResponse.success = objInput.success;
+            //objHttpCommonResponse.message = objInput.message;
+            //objHttpCommonResponse.data = objInput.Data;
+            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+            return Ok(objInput);
         }
-
-
+        
         [HttpPost]
         [Route("Category/Insert")]
         public dynamic Category_Insert([FromBody]CategoryMstr objCategoryData)
@@ -1721,7 +1763,6 @@ namespace ShopCart.Controllers
             objHttpCommonResponse.data = objInput.Data;
             return Ok(objHttpCommonResponse);
         }
-
         [HttpPost]
         [Route("Category/Edit/{CategoryId}")]
         public dynamic Category_Edit([FromBody]CategoryMstr objCategoryData, int CategoryId)
@@ -1879,6 +1920,7 @@ namespace ShopCart.Controllers
             return Ok(objHttpCommonResponse);
         }
 
+        
 
 
 
@@ -3826,6 +3868,173 @@ namespace ShopCart.Controllers
             return Ok(objHttpCommonResponse);
         }
 
+        [HttpGet]
+        [Route("Product/GetAll/Fordeal")]
+        public dynamic Product_GetAll_Fordeal()
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                if (!_dbContext.ProductMstr.ToList().Any())
+                {
+                    objInput.success = false;
+                    objInput.message = "Product is not Exist!!";
+                    objInput.Data = null;
+                }
+
+                else
+                {
+
+                    //(5 * 252 + 4 * 124 + 3 * 40 + 2 * 29 + 1 * 33) / (252 + 124 + 40 + 29 + 33) = 4.11 and change
+
+                    List<ProductMstr> productList = _dbContext.ProductMstr.Where(p => p.IsActive == true).ToList();
+                    List<product_for_deal> productdeal = new List<product_for_deal>();
+                    foreach (ProductMstr newproduct in productList)
+                    {
+                        newproduct.Cat = _dbContext.CategoryMstr.Find(newproduct.CatId);
+                        product_for_deal _pro = new product_for_deal();
+                        _pro.id = newproduct.Id;
+                        _pro.vid = newproduct.VenderId;
+                        _pro.sku = newproduct.Sku;
+                        _pro.name = newproduct.Name;
+                        _pro.currentRating = newproduct.CurrentRating;
+                        _pro.ratingCount = newproduct.RatingCount;
+                        _pro.cat = _dbContext.CategoryMstr.Find(newproduct.CatId).Name;
+                        productdeal.Add(_pro);
+                    }
+
+                    //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
+                    //String xToken = objAdminData.Id.ToString() + "#" + objAdminData.UserName + "#" + tomorrow.ToString();
+                    //objInput.AuthToken = Encrypt(xToken);
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = productdeal;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+            return Ok(objHttpCommonResponse);
+        }
+
+        [HttpPost]
+        [Route("Deal/Insert")]
+        public dynamic Deal_Insert([FromBody]dealTransfer objDealData)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+                foreach (product_for_deal product_For_Deal in objDealData.ProList)
+                {
+                    TodayDealsTbl deal = new TodayDealsTbl();
+                    deal.ProId = product_For_Deal.id;
+                    deal.AdminId = objDealData.AdminId = GetAuthId();
+                    deal.DiscountType = objDealData.DiscountType;
+                    deal.DiscountAmount = objDealData.DiscountAmount;
+                    deal.StartDate = objDealData.StartDate;
+                    deal.IsActive = true;
+                    deal.IsDeleted = false;
+                    deal.CreateDt = DateTime.UtcNow;
+                    deal.UpdateDt = DateTime.UtcNow;
+                    _dbContext.TodayDealsTbl.Add(deal);
+                    _dbContext.SaveChanges();
+                }
+                objInput.success = true;
+                objInput.message = "Successfully. ";
+                objInput.Data = objDealData;
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            return Ok(objHttpCommonResponse);
+        }
+
+        [HttpGet]
+        [Route("Deal/GetAll")]
+        public dynamic Deal_GetAll()
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                List<TodayDealsTbl> dealLs = _dbContext.TodayDealsTbl.Where(p => p.StartDate > DateTime.Now.AddDays(-1)).GroupBy(pg => new
+                {
+                    pg.AdminId,
+                    pg.StartDate,
+                    pg.DiscountType,
+                    pg.DiscountAmount,
+                }).Select(
+                    gcs => new TodayDealsTbl()
+                    {
+                        AdminId = gcs.Key.AdminId,
+                        StartDate = gcs.Key.StartDate,
+                        DiscountAmount = gcs.Key.DiscountAmount,
+                        DiscountType = gcs.Key.DiscountType
+                    }).ToList();
+                List<dealTransfer> dealTransfer = new List<dealTransfer>();
+                foreach (TodayDealsTbl deal in dealLs)
+                {
+                    dealTransfer dealTransfer1 = new dealTransfer();
+                    dealTransfer1.AdminId = deal.AdminId;
+                    dealTransfer1.DiscountType = deal.DiscountType;
+                    dealTransfer1.DiscountAmount = deal.DiscountAmount;
+                    dealTransfer1.StartDate = deal.StartDate;
+                    dealTransfer1.ProList = new List<product_for_deal>();
+                    List<TodayDealsTbl> alldeal = _dbContext.TodayDealsTbl.Where(p => p.StartDate == deal.StartDate && p.DiscountType == deal.DiscountType && p.DiscountAmount == deal.DiscountAmount).ToList();
+                    foreach (TodayDealsTbl onedeal in alldeal)
+                    {
+                        ProductMstr product = _dbContext.ProductMstr.Find(onedeal.ProId);
+                        product_for_deal product_For = new product_for_deal();
+                        product_For.vid = product.VenderId;
+                        product_For.sku = product.Sku;
+                        product_For.name = product.Name;
+                        product_For.currentRating = product.CurrentRating;
+                        product_For.ratingCount = product.RatingCount;
+                        product_For.cat = _dbContext.CategoryMstr.Find(product.CatId).Name;
+
+                        dealTransfer1.ProList.Add(product_For);
+                    }
+
+                    dealTransfer.Add(dealTransfer1);
+                }
+
+                objInput.success = true;
+                objInput.message = "Successfully. ";
+                objInput.Data = dealTransfer;
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            return Ok(objHttpCommonResponse);
+        }
+
         #endregion
 
         #endregion
@@ -4028,7 +4237,13 @@ namespace ShopCart.Controllers
             public string id { get; set; }
             public string ProductId { get; set; }
         }
-        public class MetaData
+        public class InputloginData{
+            public bool status { get; set; }
+            public dynamic Data { get; set; }
+            public string token { get; set; }
+            public string message { get; set; }
+        }
+    public class MetaData
         {
             public int? totalCount { get; set; }
             public int? start { get; set; }

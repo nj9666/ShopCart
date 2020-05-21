@@ -46,7 +46,7 @@ namespace ShopCart.Models
             if (!optionsBuilder.IsConfigured)
             {
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. See http://go.microsoft.com/fwlink/?LinkId=723263 for guidance on storing connection strings.
-                optionsBuilder.UseSqlServer("Data Source=DESKTOP-5A3V7O6;Initial Catalog=DemoCrat;Persist Security Info=True;User ID=sa;Password=123;");
+                optionsBuilder.UseSqlServer("Data Source=DESKTOP-5A3V7O6;Initial Catalog=ShopDummy;Persist Security Info=True;User ID=sa;Password=123;");
             }
         }
 
@@ -885,11 +885,11 @@ namespace ShopCart.Models
 
                 entity.Property(e => e.IsDeleted).HasColumnName("is_deleted");
 
+                entity.Property(e => e.ProId).HasColumnName("pro_id");
+
                 entity.Property(e => e.StartDate)
                     .HasColumnName("start_date")
                     .HasColumnType("datetime");
-
-                entity.Property(e => e.SubProId).HasColumnName("sub_pro_id");
 
                 entity.Property(e => e.UpdateDt)
                     .HasColumnName("update_dt")
@@ -900,9 +900,9 @@ namespace ShopCart.Models
                     .HasForeignKey(d => d.AdminId)
                     .HasConstraintName("FK_today_deals_tbl_admin_mstr");
 
-                entity.HasOne(d => d.SubPro)
+                entity.HasOne(d => d.Pro)
                     .WithMany(p => p.TodayDealsTbl)
-                    .HasForeignKey(d => d.SubProId)
+                    .HasForeignKey(d => d.ProId)
                     .HasConstraintName("FK_today_deals_tbl_sub_product_tbl");
             });
 

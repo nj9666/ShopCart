@@ -10,7 +10,6 @@ namespace ShopCart.Models
             CartTbl = new HashSet<CartTbl>();
             OrderDetailsTbl = new HashSet<OrderDetailsTbl>();
             ProductImg = new HashSet<ProductImg>();
-            TodayDealsTbl = new HashSet<TodayDealsTbl>();
             WishlistTbl = new HashSet<WishlistTbl>();
         }
 
@@ -32,7 +31,6 @@ namespace ShopCart.Models
         public ICollection<CartTbl> CartTbl { get; set; }
         public ICollection<OrderDetailsTbl> OrderDetailsTbl { get; set; }
         public ICollection<ProductImg> ProductImg { get; set; }
-        public ICollection<TodayDealsTbl> TodayDealsTbl { get; set; }
         public ICollection<WishlistTbl> WishlistTbl { get; set; }
     }
 }

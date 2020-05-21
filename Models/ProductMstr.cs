@@ -9,6 +9,7 @@ namespace ShopCart.Models
         {
             RatingTbl = new HashSet<RatingTbl>();
             SubProductTbl = new HashSet<SubProductTbl>();
+            TodayDealsTbl = new HashSet<TodayDealsTbl>();
         }
 
         public int Id { get; set; }
@@ -38,5 +39,6 @@ namespace ShopCart.Models
         public VenderMstr Vender { get; set; }
         public ICollection<RatingTbl> RatingTbl { get; set; }
         public ICollection<SubProductTbl> SubProductTbl { get; set; }
+        public ICollection<TodayDealsTbl> TodayDealsTbl { get; set; }
     }
 }
