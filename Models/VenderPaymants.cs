@@ -9,8 +9,8 @@ namespace ShopCart.Models
         public int VenderId { get; set; }
         public DateTime PaymantDate { get; set; }
         public decimal BankAccount { get; set; }
-        public int NeftId { get; set; }
-        public int Amount { get; set; }
+        public int TransactionId { get; set; }
+        public decimal Amount { get; set; }
 
         public VenderMstr Vender { get; set; }
     }

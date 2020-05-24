@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -1395,7 +1396,7 @@ namespace ShopCart.Controllers
                     objInput.message = "you are not able to this!!";
                     objInput.Data = null;
                 }
-                else if(!_dbContext.RatingTbl.Where(p => p.Id == objRatingData.Id && p.UserId == UserId).Any())
+                else if (!_dbContext.RatingTbl.Where(p => p.Id == objRatingData.Id && p.UserId == UserId).Any())
                 {
                     objInput.success = false;
                     objInput.message = "Rating is Not Exist!!";
@@ -1668,7 +1669,7 @@ namespace ShopCart.Controllers
                 {
                     Data = _dbContext.AdminMstr.Where(p => (p.UserName == objAdminData.UserName) && p.Password == objAdminData.Password).ToList();
                 }
-                
+
                 if (Data.Count == 0)
                 {
                     objInput.status = false;
@@ -1709,7 +1710,7 @@ namespace ShopCart.Controllers
             //objHttpCommonResponse.AuthToken = objInput.AuthToken;
             return Ok(objInput);
         }
-        
+
         [HttpPost]
         [Route("Category/Insert")]
         public dynamic Category_Insert([FromBody]CategoryMstr objCategoryData)
@@ -1920,7 +1921,7 @@ namespace ShopCart.Controllers
             return Ok(objHttpCommonResponse);
         }
 
-        
+
 
 
 
@@ -1931,6 +1932,12 @@ namespace ShopCart.Controllers
             InputData objInput = new InputData();
             try
             {
+
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
                 if (_dbContext.CouponMstr.Where(p => p.CoupCode == objCouponData.CoupCode).Any())
                 {
                     objInput.success = false;
@@ -1939,6 +1946,7 @@ namespace ShopCart.Controllers
                 }
                 else
                 {
+                    objCouponData.AdminId = GetAuthId();
                     objCouponData.IsActive = true;
                     objCouponData.IsDeleted = false;
                     objCouponData.CreateDt = DateTime.UtcNow;
@@ -1979,7 +1987,7 @@ namespace ShopCart.Controllers
                     objInput.message = "Coupon is not avalable!!";
                     objInput.Data = null;
                 }
-                else if (_dbContext.CouponMstr.Where(p => p.CoupCode == objCouponData.CoupCode).Any())
+                else if (_dbContext.CouponMstr.Where(p => p.CoupCode == objCouponData.CoupCode && p.Id != CouponId).Any())
                 {
                     objInput.success = false;
                     objInput.message = "Coupon code is already register!!";
@@ -1994,6 +2002,9 @@ namespace ShopCart.Controllers
                     dbCoupon.Description = objCouponData.Description == null ? dbCoupon.Description : objCouponData.Description;
                     dbCoupon.DiscountType = objCouponData.DiscountType == 0 ? dbCoupon.DiscountType : objCouponData.DiscountType;
                     dbCoupon.DiscountAmount = objCouponData.DiscountAmount == null ? dbCoupon.DiscountAmount : objCouponData.DiscountAmount;
+                    dbCoupon.StartDate = objCouponData.StartDate == null ? dbCoupon.StartDate : objCouponData.StartDate;
+                    dbCoupon.EndDate = objCouponData.EndDate == null ? dbCoupon.EndDate : objCouponData.EndDate;
+
 
 
                     dbCoupon.UpdateDt = DateTime.UtcNow;
@@ -2755,6 +2766,135 @@ namespace ShopCart.Controllers
             return Ok(objHttpCommonResponse);
         }
 
+        [HttpGet]
+        [Route("Order/ByProduct/GetAll")]
+        public dynamic Order_ByProduct_GetAll()
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                if (_dbContext.OrderTbl.Count() <= 0)
+                {
+                    objInput.success = false;
+                    objInput.message = "Order is not avalable!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+                    List<orderByP> orderByPs = new List<orderByP>();
+                    var Order_ByProduct = _dbContext.OrderDetailsTbl.OrderBy(p => p.SubProducatId).GroupBy(p => p.SubProducatId);
+                    
+
+                    foreach (var gp in Order_ByProduct)
+                    {
+                        orderByP orderByP = new orderByP();
+                        foreach (OrderDetailsTbl item in gp)
+                        {
+                            var orderDetailsTbl = _dbContext.OrderDetailsTbl.Where( p => p.Id == item.Id).Select(ss => new {
+                                pic = ss.SubProducat.ProductImg.FirstOrDefault().Path,
+                                name = ss.SubProducat.Product.Name,
+                                sku = ss.SubProducat.Product.Sku,
+                                price = ss.SubProducat.Price,
+                                color = ss.SubProducat.Color.Name,
+                                size = ss.SubProducat.Size.Name,
+                            }).FirstOrDefault();
+
+                            orderByP.pic = orderDetailsTbl.pic;
+                            orderByP.name = orderDetailsTbl.name;
+                            orderByP.sku = orderDetailsTbl.sku;
+                            orderByP.price = orderDetailsTbl.price;
+                            orderByP.color = orderDetailsTbl.color;
+                            orderByP.size = orderDetailsTbl.size;
+
+                            orderByP.totalCount += 1;
+                        }
+                        orderByP.totalAmount = (orderByP.totalCount * orderByP.price);
+                        orderByPs.Add(orderByP);
+                    }
+                    
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = orderByPs;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            return Ok(objHttpCommonResponse);
+        }
+
+        [HttpGet]
+        [Route("Order/ByProduct/latest")]
+        public dynamic Order_ByProduct_latest()
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                if (_dbContext.OrderTbl.Count() <= 0)
+                {
+                    objInput.success = false;
+                    objInput.message = "Order is not avalable!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+                    List<orderByP> orderByPs = new List<orderByP>();
+                    var Order_ByProduct = _dbContext.OrderDetailsTbl.Where(p => p.CreateDt > DateTime.Now.AddDays(-30)).OrderBy(p => p.SubProducatId).GroupBy(p => p.SubProducatId);
+
+
+                    foreach (var gp in Order_ByProduct)
+                    {
+                        orderByP orderByP = new orderByP();
+                        foreach (OrderDetailsTbl item in gp)
+                        {
+                            var orderDetailsTbl = _dbContext.OrderDetailsTbl.Where(p => p.Id == item.Id).Select(ss => new {
+                                pic = ss.SubProducat.ProductImg.FirstOrDefault().Path,
+                                name = ss.SubProducat.Product.Name,
+                                sku = ss.SubProducat.Product.Sku,
+                                price = ss.SubProducat.Price,
+                                color = ss.SubProducat.Color.Name,
+                                size = ss.SubProducat.Size.Name,
+                            }).FirstOrDefault();
+
+                            orderByP.pic = orderDetailsTbl.pic;
+                            orderByP.name = orderDetailsTbl.name;
+                            orderByP.sku = orderDetailsTbl.sku;
+                            orderByP.price = orderDetailsTbl.price;
+                            orderByP.color = orderDetailsTbl.color;
+                            orderByP.size = orderDetailsTbl.size;
+
+                            orderByP.totalCount += 1;
+                        }
+                        orderByP.totalAmount = (orderByP.totalCount * orderByP.price);
+                        orderByPs.Add(orderByP);
+                    }
+
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = orderByPs;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            return Ok(objHttpCommonResponse);
+        }
 
 
         #endregion
@@ -3005,10 +3145,110 @@ namespace ShopCart.Controllers
                 else
                 {
                     List<VenderMstr> dbVender = _dbContext.VenderMstr.ToList();
+                    List<venderFadminList> Venderfadmin = new List<venderFadminList>();
+                    foreach (VenderMstr dbVenderone in dbVender)
+                    {
+                        venderFadminList Venderfadminone = new venderFadminList();
+                        Venderfadminone.Id = dbVenderone.Id;
+                        Venderfadminone.DisplayBusinessName = dbVenderone.DisplayBusinessName;
+                        Venderfadminone.VenderFullName = dbVenderone.VenderFullName;
+                        Venderfadminone.MobileNumber = dbVenderone.MobileNumber;
+                        Venderfadminone.Email = dbVenderone.Email;
+
+                         VenderPaymants ven_paymant = _dbContext.VenderPaymants.Where(p => p.VenderId == dbVenderone.Id).OrderByDescending(p => p.PaymantDate).FirstOrDefault();
+
+                        DateTime lastPdate = default(DateTime);
+                        if (ven_paymant != null)
+                        {
+                            lastPdate = ven_paymant.PaymantDate;
+                        }
+
+                        if (lastPdate != default(DateTime))
+                        {
+                            Venderfadminone.lastPayDate = lastPdate;
+                            var od = _dbContext.OrderDetailsTbl.Where(p => p.SubProducat.Product.VenderId == dbVenderone.Id && p.Order.CreateDt > lastPdate && p.VenderPaymantStatus == 1).Select(ss => new {
+                                    qty = ss.Qty,
+                                    price = ss.SubProducat.Price,
+                                });
+                            foreach (var item in od)
+                            {
+                                Venderfadminone.PaymantAmount += (decimal)(item.qty * item.price);
+                            }
+                            DateTime curDate = DateTime.Now.Date.AddDays(-15);
+                            if (Venderfadminone.PaymantAmount > 0 )
+                            {
+                                if (lastPdate > curDate)
+                                {
+                                    Venderfadminone.Paymant = 3;
+                                }
+                                else if (lastPdate < curDate)
+                                {
+
+                                    Venderfadminone.Paymant = 1;
+                                }
+                                else
+                                {
+                                    Venderfadminone.Paymant = 2;
+                                }
+                            }
+                            else
+                            {
+                                Venderfadminone.Paymant = 4;
+                            }
+                            
+
+                        }
+                        else
+                        {
+                            var od = _dbContext.OrderDetailsTbl.Where(p => p.SubProducat.Product.VenderId == dbVenderone.Id && p.VenderPaymantStatus == 1).Select(ss => new {
+                                qty = ss.Qty,
+                                price = ss.SubProducat.Price,
+                            });
+                            foreach (var item in od)
+                            {
+                                Venderfadminone.PaymantAmount += (decimal)(item.qty * item.price);
+                            }
+                            var jDate = dbVenderone.CreateDt;
+
+
+                            DateTime curDate = DateTime.Now.Date.AddDays(-15);
+                            if (Venderfadminone.PaymantAmount > 0)
+                            {
+                                if (jDate > curDate)
+                                {
+                                    Venderfadminone.Paymant = 3;
+                                }
+                                else if (jDate < curDate)
+                                {
+
+                                    Venderfadminone.Paymant = 1;
+                                }
+                                else
+                                {
+                                    Venderfadminone.Paymant = 2;
+                                }
+                            }
+                            else
+                            {
+                                Venderfadminone.Paymant = 4;
+                            }
+
+                        }
+                        
+                        VanderBankDetailsTbl bankd = _dbContext.VanderBankDetailsTbl.Where(p => p.VenderId == dbVenderone.Id).FirstOrDefault();
+                        if (bankd != null) { 
+                        Venderfadminone.AccountHolderName = bankd.AccountHolderName;
+                        Venderfadminone.AccountNumber = bankd.AccountNumber;
+                        Venderfadminone.IfscCode = bankd.IfscCode;
+                        Venderfadminone.BankName = bankd.BankName;
+                        Venderfadminone.Branch = bankd.Branch;
+                        }
+                        Venderfadmin.Add(Venderfadminone);
+                    }
 
                     objInput.success = true;
                     objInput.message = "Successfully. ";
-                    objInput.Data = dbVender;
+                    objInput.Data = Venderfadmin;
                 }
 
             }
@@ -3024,6 +3264,100 @@ namespace ShopCart.Controllers
             objHttpCommonResponse.data = objInput.Data;
             return Ok(objHttpCommonResponse);
         }
+
+        [HttpPost]
+        [Route("Vender/PayInsert")]
+        public dynamic Vender_Pay_Insert([FromBody]VenderPaymants objVenderPayData)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+                List<OrderDetailsTbl> OrderD_List = _dbContext.OrderDetailsTbl.Where(p => p.SubProducat.Product.VenderId == objVenderPayData.VenderId).ToList();
+                foreach (OrderDetailsTbl item in OrderD_List)
+                {
+                    item.VenderPaymantStatus = 2;
+                }
+
+                objVenderPayData.PaymantDate = DateTime.Now;
+                _dbContext.VenderPaymants.Add(objVenderPayData);
+                _dbContext.SaveChanges();
+
+
+                objInput.success = true;
+                objInput.message = "Successfully. ";
+                objInput.Data = objVenderPayData;
+                
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            return Ok(objHttpCommonResponse);
+        }
+
+
+        [HttpGet]
+        [Route("Vender/PayGetAll")]
+        public dynamic Vender_Pay_GetAll()
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+                if (_dbContext.VenderPaymants.Count() <= 0)
+                {
+                    objInput.success = false;
+                    objInput.message = "No one hase is not avalable!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+                    var dbVenderP = _dbContext.VenderPaymants.OrderByDescending(p => p.PaymantDate).Select(ss => new {
+                        id = ss.Id,
+                        displayBusinessName = ss.Vender.DisplayBusinessName,
+                        venderFullName = ss.Vender.VenderFullName,
+                        bankAccount = ss.BankAccount,
+                        transid = ss.TransactionId,
+                        paymantAmount = ss.Amount,
+                        paymantDate = ss.PaymantDate
+                    });
+
+
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = dbVenderP;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            return Ok(objHttpCommonResponse);
+        }
+
 
         #endregion
 
@@ -4035,6 +4369,84 @@ namespace ShopCart.Controllers
             return Ok(objHttpCommonResponse);
         }
 
+
+        [HttpPost]
+        [Route("Deal/Edit")]
+        public dynamic Deal_Edit([FromBody]dealTransfer[] objDealData)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+
+                List<TodayDealsTbl> dealLs = _dbContext.TodayDealsTbl.Where(p => p.StartDate == objDealData[0].StartDate && p.DiscountType == objDealData[0].DiscountType && p.DiscountAmount == objDealData[0].DiscountAmount).ToList();
+                foreach (TodayDealsTbl deals in dealLs)
+                {
+                    deals.StartDate = objDealData[1].StartDate;
+                    deals.DiscountType = objDealData[1].DiscountType;
+                    deals.DiscountAmount = objDealData[1].DiscountAmount;
+                    deals.UpdateDt = DateTime.Now;
+                    _dbContext.SaveChanges();
+                }
+                objInput.success = true;
+                objInput.message = "Successfully. ";
+                objInput.Data = dealLs;
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            return Ok(objHttpCommonResponse);
+        }
+        [HttpPost]
+        [Route("Deal/Remove")]
+        public dynamic Deal_Remove([FromBody]dealTransfer objDealData)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+
+                List<TodayDealsTbl> dealLs = _dbContext.TodayDealsTbl.Where(p => p.StartDate == objDealData.StartDate && p.DiscountType == objDealData.DiscountType && p.DiscountAmount == objDealData.DiscountAmount).ToList();
+
+                foreach (TodayDealsTbl deals in dealLs)
+                {
+                    _dbContext.TodayDealsTbl.Remove(deals);
+                    _dbContext.SaveChanges();
+
+                }
+                objInput.success = true;
+                objInput.message = "Successfully. ";
+                objInput.Data = dealLs;
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            return Ok(objHttpCommonResponse);
+        }
+
+
         #endregion
 
         #endregion
@@ -4237,13 +4649,14 @@ namespace ShopCart.Controllers
             public string id { get; set; }
             public string ProductId { get; set; }
         }
-        public class InputloginData{
+        public class InputloginData
+        {
             public bool status { get; set; }
             public dynamic Data { get; set; }
             public string token { get; set; }
             public string message { get; set; }
         }
-    public class MetaData
+        public class MetaData
         {
             public int? totalCount { get; set; }
             public int? start { get; set; }

@@ -8,7 +8,6 @@ namespace ShopCart.Models
         public StateMstr()
         {
             AddressTbl = new HashSet<AddressTbl>();
-            VanderBankDetailsTbl = new HashSet<VanderBankDetailsTbl>();
             VenderMstr = new HashSet<VenderMstr>();
         }
 
@@ -20,7 +19,6 @@ namespace ShopCart.Models
         public bool IsDeleted { get; set; }
 
         public ICollection<AddressTbl> AddressTbl { get; set; }
-        public ICollection<VanderBankDetailsTbl> VanderBankDetailsTbl { get; set; }
         public ICollection<VenderMstr> VenderMstr { get; set; }
     }
 }

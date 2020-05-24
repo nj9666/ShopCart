@@ -46,7 +46,7 @@ namespace ShopCart.Models
             if (!optionsBuilder.IsConfigured)
             {
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. See http://go.microsoft.com/fwlink/?LinkId=723263 for guidance on storing connection strings.
-                optionsBuilder.UseSqlServer("Data Source=DESKTOP-5A3V7O6;Initial Catalog=DummyShop;User ID=sa;Password=123");
+                optionsBuilder.UseSqlServer("Data Source=DESKTOP-5A3V7O6;Initial Catalog=DemoCrat;Persist Security Info=True;User ID=sa;Password=123;");
             }
         }
 
@@ -997,8 +997,6 @@ namespace ShopCart.Models
                     .HasColumnName("branch")
                     .HasMaxLength(20);
 
-                entity.Property(e => e.CityId).HasColumnName("city_id");
-
                 entity.Property(e => e.CreateDt)
                     .HasColumnName("create_dt")
                     .HasColumnType("datetime");
@@ -1012,25 +1010,11 @@ namespace ShopCart.Models
 
                 entity.Property(e => e.IsDeleted).HasColumnName("is_deleted");
 
-                entity.Property(e => e.StateId).HasColumnName("state_id");
-
                 entity.Property(e => e.UpdateDt)
                     .HasColumnName("update_dt")
                     .HasColumnType("datetime");
 
                 entity.Property(e => e.VenderId).HasColumnName("vender_Id");
-
-                entity.HasOne(d => d.City)
-                    .WithMany(p => p.VanderBankDetailsTbl)
-                    .HasForeignKey(d => d.CityId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
-                    .HasConstraintName("FK_vander_bank_details_tbl_city_mstr");
-
-                entity.HasOne(d => d.State)
-                    .WithMany(p => p.VanderBankDetailsTbl)
-                    .HasForeignKey(d => d.StateId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
-                    .HasConstraintName("FK_vander_bank_details_tbl_state_mstr");
 
                 entity.HasOne(d => d.Vender)
                     .WithMany(p => p.VanderBankDetailsTbl)
@@ -1138,21 +1122,21 @@ namespace ShopCart.Models
             {
                 entity.ToTable("vender_paymants");
 
-                entity.Property(e => e.Id)
-                    .HasColumnName("id")
-                    .ValueGeneratedNever();
+                entity.Property(e => e.Id).HasColumnName("id");
 
-                entity.Property(e => e.Amount).HasColumnName("amount");
+                entity.Property(e => e.Amount)
+                    .HasColumnName("amount")
+                    .HasColumnType("decimal(18, 0)");
 
                 entity.Property(e => e.BankAccount)
                     .HasColumnName("bankAccount")
                     .HasColumnType("numeric(18, 0)");
 
-                entity.Property(e => e.NeftId).HasColumnName("neftId");
-
                 entity.Property(e => e.PaymantDate)
                     .HasColumnName("paymantDate")
                     .HasColumnType("datetime");
+
+                entity.Property(e => e.TransactionId).HasColumnName("transactionId");
 
                 entity.Property(e => e.VenderId).HasColumnName("vender_id");
 
