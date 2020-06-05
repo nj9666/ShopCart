@@ -1901,10 +1901,18 @@ namespace ShopCart.Controllers
                 else
                 {
                     List<CategoryMstr> dbCategory = _dbContext.CategoryMstr.ToList();
-
+                    List<VMCategoryMstr> vMCategories = new List<VMCategoryMstr>();
+                    foreach (CategoryMstr cat in dbCategory)
+                    {
+                        VMCategoryMstr vMCategory = new VMCategoryMstr();
+                        vMCategory.Id = cat.Id;
+                        vMCategory.PCatId = cat.PCatId;
+                        vMCategory.Name = cat.Name;
+                        vMCategories.Add(vMCategory);
+                    }
                     objInput.success = true;
                     objInput.message = "Successfully. ";
-                    objInput.Data = dbCategory;
+                    objInput.Data = vMCategories;
                 }
 
             }
@@ -2896,6 +2904,80 @@ namespace ShopCart.Controllers
             return Ok(objHttpCommonResponse);
         }
 
+        [HttpGet]
+        [Route("Order/ByVender/GetAll")]
+        public dynamic Order_ByVender_GetAll()
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                if (_dbContext.OrderTbl.Count() <= 0)
+                {
+                    objInput.success = false;
+                    objInput.message = "Order is not avalable!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+                    List<orderByV> orderByvs = new List<orderByV>();
+                    List<VenderMstr> Order_Byvender = _dbContext.VenderMstr.OrderBy(p => p.Id).ToList();
+
+
+                    //var Order_Byvend = _dbContext.OrderDetailsTbl.Where(p => p.SubProducat.Product.VenderId == 1);
+
+                    foreach (VenderMstr v in Order_Byvender)
+                    {
+                        orderByV orderByV = new orderByV();
+                        List<OrderDetailsTbl> Order_Byvend = _dbContext.OrderDetailsTbl.Where(p => p.SubProducat.Product.VenderId == v.Id).ToList();
+                        foreach (OrderDetailsTbl o in Order_Byvend)
+                        {
+                            var orderDetailsTbl = _dbContext.OrderDetailsTbl.Where(p => p.Id == o.Id).Select(ss => new
+                            {
+                                qty = ss.Qty,
+                                price = ss.SubProducat.Price,
+                            }).FirstOrDefault();
+
+                            orderByV.totalCount += (int)orderDetailsTbl.qty;
+                            orderByV.totalAmount += ((int)orderDetailsTbl.qty * orderDetailsTbl.price);
+
+                            //var orderDetailsTbl = _dbContext.OrderDetailsTbl.Where(p => p.Id == o.Id).Select(ss => new
+                            //{
+                            //    qty = ss.Qty,
+                            //    price = ss.SubProducat.Price,
+                            //}).FirstOrDefault();
+
+                            //orderByV.totalCount += (int)o.Qty;
+                            //orderByV.totalAmount += ((int)o.Qty * o.SubProducat.Price);
+                        }
+                        orderByV.displayBusinessName = v.DisplayBusinessName;
+                        orderByV.venderFullName = v.VenderFullName;
+                        if (orderByV.totalCount != 0)
+                        {
+                            orderByvs.Add(orderByV);
+                        }
+                    }
+
+
+
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = orderByvs;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            return Ok(objHttpCommonResponse);
+        }
+
 
         #endregion
 
@@ -2919,6 +3001,10 @@ namespace ShopCart.Controllers
                 }
                 else
                 {
+                    //objVenderData.CityId = 1;
+                    //objVenderData.StateId= 1;
+                    //objVenderData.CountryId = 1;
+
                     objVenderData.IsActive = true;
                     objVenderData.IsDeleted = false;
                     objVenderData.CreateDt = DateTime.UtcNow;
@@ -2949,15 +3035,27 @@ namespace ShopCart.Controllers
         [Route("Vender/Login")]
         public dynamic Vender_Login([FromBody]VenderMstr objVenderData)
         {
-            InputData objInput = new InputData();
+            InputloginData objInput = new InputloginData();
+
             try
             {
-                var Data = _dbContext.VenderMstr.Where(p => (p.Email == objVenderData.Email || p.MobileNumber == Decimal.Parse(objVenderData.Email)) && p.Password == objVenderData.Password).ToList();
+                //VenderMstr UpdateObj = _dbContext.VenderMstr.Single(p => p.ContactNumber == objVenderData.ContactNumber);
+                //UpdateObj.Token = objUserData.noti_token;
+                //_SellerProductContext.SaveChanges();
+                var Data = new List<VenderMstr>();
+                if (decimal.TryParse(objVenderData.Email, out _))
+                {
+                    Data = _dbContext.VenderMstr.Where(p => (p.MobileNumber == Decimal.Parse(objVenderData.Email)) && p.Password == objVenderData.Password).ToList();
+                }
+                else
+                {
+                    Data = _dbContext.VenderMstr.Where(p => (p.Email == objVenderData.Email) && p.Password == objVenderData.Password).ToList();
+                }
 
                 if (Data.Count == 0)
                 {
-                    objInput.success = false;
-                    objInput.message = "Incorrect Password.";
+                    objInput.status = false;
+                    objInput.message = "Email password miss match.";
                     objInput.Data = null;
                 }
                 else
@@ -2967,14 +3065,14 @@ namespace ShopCart.Controllers
                         DateTime tomorrow = DateTime.UtcNow.AddHours(24);
                         string xToken = Data[0].Id.ToString() + "#" + Data[0].Email + "#" + tomorrow.ToString();
 
-                        objInput.success = true;
-                        objInput.message = "Successfully.";
-                        objInput.Data = Data;
-                        objInput.AuthToken = Encrypt(xToken);
+                        objInput.status = true;
+                        objInput.message = "User Found Successfully.";
+                        objInput.Data = Data[0];
+                        objInput.token = Encrypt(xToken);
                     }
                     else
                     {
-                        objInput.success = false;
+                        objInput.status = false;
                         objInput.message = "This user is currently deactivate.";
                         objInput.Data = null;
                     }
@@ -2983,16 +3081,18 @@ namespace ShopCart.Controllers
             }
             catch (Exception ex)
             {
-                objInput.success = false;
+                objInput.status = false;
                 objInput.message = "Something went wrong, please contact support";
                 objInput.Data = null;
             }
 
-            objHttpCommonResponse.success = objInput.success;
-            objHttpCommonResponse.message = objInput.message;
-            objHttpCommonResponse.data = objInput.Data;
-            objHttpCommonResponse.AuthToken = objInput.AuthToken;
-            return Ok(objHttpCommonResponse);
+
+
+            //objHttpCommonResponse.success = objInput.success;
+            //objHttpCommonResponse.message = objInput.message;
+            //objHttpCommonResponse.data = objInput.Data;
+            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+            return Ok(objInput);
         }
 
 
@@ -3357,6 +3457,579 @@ namespace ShopCart.Controllers
             objHttpCommonResponse.data = objInput.Data;
             return Ok(objHttpCommonResponse);
         }
+
+
+        [HttpGet]
+        [Route("Vender/GetGrowth/{day}")]
+        public dynamic Vender_GetGrowth(int day)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+                int venderid = GetAuthId();
+                VGrowth vg = new VGrowth();
+
+                DateTime lastdate = DateTime.Now.AddDays(-day);
+                List<OrderDetailsTbl> orderDetailsTbls = _dbContext.OrderDetailsTbl.Where(p => p.SubProducat.Product.VenderId == venderid && p.OrderSubStatus == 4 && p.CreateDt > lastdate).ToList();
+
+                foreach (OrderDetailsTbl od in orderDetailsTbls)
+                {
+                    vg.seleInRupee += (_dbContext.SubProductTbl.Where(p => p.Id == od.SubProducatId).FirstOrDefault().Price * od.Qty);
+                    vg.seleInUnint += od.Qty;
+                }
+
+                List<OrderDetailsTbl> orederDt = _dbContext.OrderDetailsTbl.Where(p => p.SubProducat.Product.VenderId == venderid && p.OrderSubStatus == 4 ).ToList();
+                List<ReturnTbl> returns = new List<ReturnTbl>();
+
+                foreach (OrderDetailsTbl od in orederDt)
+                {
+                    vg.returnUint = _dbContext.ReturnTbl.Where(p => p.Order.OrderDetailsTbl.Contains(od) && p.CreateDt > lastdate).Count();
+                }
+
+                List<ProductMstr> productMstrs = _dbContext.ProductMstr.Where(p => p.VenderId == venderid).ToList();
+                decimal totalrating = 0;
+
+                foreach (ProductMstr product in productMstrs)
+                {
+                    totalrating = Decimal.Add(totalrating, product.CurrentRating);
+                }
+                vg.avgrating = Decimal.Divide(totalrating, productMstrs.Count());
+
+                objInput.success = true;
+                objInput.message = "Successfully. ";
+                objInput.Data = vg;
+                
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            return Ok(objHttpCommonResponse);
+        }
+
+
+        [HttpGet]
+        [Route("Vender/PayGetAll/ForMe")]
+        public dynamic Vender_Pay_GetAllForMe()
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+                int venderid = GetAuthId();
+                List<VenderPaymants> venderPaymants = _dbContext.VenderPaymants.Where(p => p.VenderId == venderid).ToList(); 
+                if (venderPaymants.Count() <= 0)
+                {
+                    objInput.success = false;
+                    objInput.message = "No one hase is not avalable!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = venderPaymants;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            return Ok(objHttpCommonResponse);
+        }
+
+        [HttpGet]
+        [Route("Vender/PayOverView")]
+        public dynamic Vender_PayOverView()
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+                PaymentOverView paymentOverView = new PaymentOverView();
+
+                int venderid = GetAuthId();
+                VenderPaymants ven_paymant = _dbContext.VenderPaymants.Where(p => p.VenderId == venderid).OrderByDescending(p => p.PaymantDate).FirstOrDefault();
+
+
+                DateTime lastPdate = default(DateTime);
+                if (ven_paymant != null)
+                {
+                    lastPdate = ven_paymant.PaymantDate;
+                }
+
+                if (lastPdate != default(DateTime))
+                {
+                    paymentOverView.lastPay_date = lastPdate;
+                    paymentOverView.ltotal = ven_paymant.Amount;
+
+
+                    var od = _dbContext.OrderDetailsTbl.Where(p => p.SubProducat.Product.VenderId == venderid && p.Order.CreateDt > lastPdate && p.VenderPaymantStatus == 1).Select(ss => new
+                    {
+                        qty = ss.Qty,
+                        price = ss.SubProducat.Price,
+                    });
+                    foreach (var item in od)
+                    {
+                        paymentOverView.ntotal += (decimal)(item.qty * item.price);
+                    }
+                    if (paymentOverView.ntotal > 0)
+                    {
+                        if(lastPdate.AddDays(15) < DateTime.Now)
+                        {
+                            paymentOverView.nextPay_date = DateTime.Now;
+                        }
+                        else
+                        {
+                            paymentOverView.nextPay_date = lastPdate.AddDays(15);
+                        }
+                    }
+                    else
+                    {
+                        paymentOverView.nextPay_date = DateTime.Now.AddDays(15);
+                    }
+
+                }
+                else
+                {
+                    var od = _dbContext.OrderDetailsTbl.Where(p => p.SubProducat.Product.VenderId == venderid && p.VenderPaymantStatus == 1).Select(ss => new
+                    {
+                        qty = ss.Qty,
+                        price = ss.SubProducat.Price,
+                    });
+                    foreach (var item in od)
+                    {
+                        paymentOverView.ntotal += (decimal)(item.qty * item.price);
+                    }
+                    var jDate = _dbContext.VenderMstr.Where(p => p.Id == venderid).FirstOrDefault().CreateDt;
+
+                    if (paymentOverView.ntotal > 0)
+                    {
+                        if (jDate.AddDays(15) < DateTime.Now)
+                        {
+                            paymentOverView.nextPay_date = DateTime.Now;
+                        }
+                        else
+                        {
+                            paymentOverView.nextPay_date = jDate.AddDays(15);
+                        }
+                    }
+                    else
+                    {
+                        paymentOverView.nextPay_date = DateTime.Now.AddDays(15);
+                    }
+                }
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = paymentOverView;
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            return Ok(objHttpCommonResponse);
+        }
+
+
+        [HttpGet]
+        [Route("Vender/MyReturn")]
+        public dynamic Vender_MyReturn()
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+                int venderid = GetAuthId();
+                List<ReturnTbl> rs = new List<ReturnTbl>();
+                List<returnorderGet> finalreturns = new List<returnorderGet>();
+
+                List<OrderDetailsTbl> orderDetails = _dbContext.OrderDetailsTbl.Where(p => p.SubProducat.Product.VenderId == venderid).ToList();
+
+                foreach (OrderDetailsTbl od in orderDetails)
+                {
+                    List<ReturnTbl> returns = _dbContext.ReturnTbl.Where(p => p.Order.OrderDetailsTbl.Contains(od)).ToList();
+                    foreach (ReturnTbl item in returns)
+                    {
+                        returnorderGet returnorder = new returnorderGet();
+                        SubProductTbl sp = _dbContext.SubProductTbl.Find(od.SubProducatId);
+                        UserMstr user = _dbContext.UserMstr.Find(item.UserId);
+                        ProductMstr pro = _dbContext.ProductMstr.Find(sp.ProductId);
+                        returnorder.id = item.Id;
+                        returnorder.sku = pro.Sku;
+                        returnorder.productName = pro.Name;
+                        returnorder.qty = od.Qty;
+                        returnorder.price = sp.Price;
+                        returnorder.color = _dbContext.ColoursTbl.Find(sp.ColorId).Name;
+                        returnorder.size = _dbContext.SizesTbl.Find(sp.SizeId).Name;
+                        returnorder.username = user.FirstName +" "+ user.LastName;
+                        finalreturns.Add(returnorder);
+                    }
+                }
+
+                if (finalreturns.Count() <= 0)
+                {
+                    objInput.success = false;
+                    objInput.message = "No one hase is not avalable!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = finalreturns;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            return Ok(objHttpCommonResponse);
+        }
+
+
+        [HttpGet]
+        [Route("Vender/MyOrder")]
+        public dynamic Vender_MyOrder()
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+                int venderid = GetAuthId();
+
+                //List<OrderDetailsTbl> orders1 = _dbContext.OrderDetailsTbl.Where(p => p.SubProducat.Product.VenderId == venderid).ToList();
+                
+                //List<OrderDetailsTbl> orders2 = _dbContext.OrderDetailsTbl.Join(_dbContext.OrderTbl,).Where(p => p.SubProducat.Product.VenderId == venderid).Join().ToList();
+
+
+
+
+                var orders3 = _dbContext.OrderDetailsTbl
+                    .Join(_dbContext.OrderTbl, od => od.OrderId, o => o.Id,(od, o) => new { od, o })
+
+                    .Where(p => p.od.SubProducat.Product.VenderId == venderid)
+                                    .Select(p => new {
+                                        p.od.Id,
+                                        p.o.OrderIdV,
+                                        p.od.SubProducat.Product.Sku,
+                                        p.od.SubProducat.Product.Name,
+                                        p.od.Qty,
+                                        p.od.SubProducat.Price,
+                                        p.o.User.UserName,
+                                        p.od.OrderSubStatus,
+                                    }).ToList();
+                //foreach (var item in orders3)
+                //{
+                //    vender_orderget orderget = new vender_orderget();
+                //    orderget.id = item.od.Id;
+                //    orderget.sku = _dbContext.OrderDetailsTbl.Find(item.od.Id).SubProducat.Product.Sku;
+                //    fianlorders.Add(orderget);
+                //}
+                if (orders3.Count() <= 0)
+                {
+                    objInput.success = false;
+                    objInput.message = "No one hase is not avalable!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = orders3;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            return Ok(objHttpCommonResponse);
+        }
+
+
+        [HttpPost]
+        [Route("Vender/ChangeStatusOrder")]
+        public dynamic Vender_ChangeStatusOrder([FromBody]List<vender_orderget> objvender_orderget)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+
+                if (objvender_orderget != null)
+                {
+                    foreach (vender_orderget item in objvender_orderget)
+                    {
+                        OrderDetailsTbl orderDet = _dbContext.OrderDetailsTbl.Find(item.Id);
+                        if(item.OrderSubStatus < 5 ) { 
+                            orderDet.OrderSubStatus = BitConverter.GetBytes(item.OrderSubStatus + 1).First();
+                        }
+                        OrderTbl order = _dbContext.OrderTbl.Find(orderDet.OrderId);
+                        List<OrderDetailsTbl> orderDetails = _dbContext.OrderDetailsTbl.Where(p => p.OrderId == order.Id).ToList();
+                        var flag = true;
+                        foreach (OrderDetailsTbl od in orderDetails)
+                        {
+                            if(od.OrderSubStatus != orderDet.OrderSubStatus)
+                            {
+                                flag = false;
+                            }
+                        }
+                        if (flag)
+                        {
+                            order.Status = orderDet.OrderSubStatus;
+                        }
+                    }
+                    _dbContext.SaveChanges();
+
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = objvender_orderget;
+                }
+                else
+                {
+                    objInput.success = false;
+                    objInput.message = "No data for change.  ";
+                    objInput.Data = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            return Ok(objHttpCommonResponse);
+        }
+
+        [HttpPost]
+        [Route("Vender/RejectOrder")]
+        public dynamic Vender_RejectOrder([FromBody]List<vender_orderget> objvender_orderget)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+
+                if (objvender_orderget != null)
+                {
+                    foreach (vender_orderget item in objvender_orderget)
+                    {
+                        OrderDetailsTbl orderDet = _dbContext.OrderDetailsTbl.Find(item.Id);
+                        orderDet.OrderSubStatus = BitConverter.GetBytes(6).First();
+                        OrderTbl order = _dbContext.OrderTbl.Find(orderDet.OrderId);
+                        List<OrderDetailsTbl> orderDetails = _dbContext.OrderDetailsTbl.Where(p => p.OrderId == order.Id).ToList();
+                        var flag = true;
+                        foreach (OrderDetailsTbl od in orderDetails)
+                        {
+                            if (od.OrderSubStatus != orderDet.OrderSubStatus)
+                            {
+                                flag = false;
+                            }
+                        }
+                        if (flag)
+                        {
+                            order.Status = orderDet.OrderSubStatus;
+                        }
+                    }
+                    _dbContext.SaveChanges();
+
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = objvender_orderget;
+                }
+                else
+                {
+                    objInput.success = false;
+                    objInput.message = "No data for change.  ";
+                    objInput.Data = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            return Ok(objHttpCommonResponse);
+        }
+
+        [HttpGet]
+        [Route("Vender/Inventory")]
+        public dynamic Vender_Inventory()
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+                int venderid = GetAuthId();
+
+                List<OrderDetailsTbl> orders1 = _dbContext.OrderDetailsTbl.Where(p => p.SubProducat.Product.VenderId == venderid).ToList();
+
+                //List<OrderDetailsTbl> orders2 = _dbContext.OrderDetailsTbl.Join(_dbContext.OrderTbl,).Where(p => p.SubProducat.Product.VenderId == venderid).Join().ToList();
+
+
+
+
+                var stocks = _dbContext.SubProductTbl
+                    .Join(_dbContext.ProductMstr, sp => sp.ProductId, p => p.Id, (sp, p) => new { sp, p })
+                    .Where(s => s.sp.Product.VenderId == venderid)
+                                    .Select(s => new {
+                                        s.sp.Id,
+                                        s.p.Sku,
+                                        pname =  s.p.Name,
+                                        s.sp.Qty,
+                                        cname = s.sp.Color.Name,
+                                        sname = s.sp.Size.Name,
+                                    }).ToList();
+                //foreach (var item in orders3)
+                //{
+                //    vender_orderget orderget = new vender_orderget();
+                //    orderget.id = item.od.Id;
+                //    orderget.sku = _dbContext.OrderDetailsTbl.Find(item.od.Id).SubProducat.Product.Sku;
+                //    fianlorders.Add(orderget);
+                //}
+                if (stocks.Count() <= 0)
+                {
+                    objInput.success = false;
+                    objInput.message = "No one hase is not avalable!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = stocks;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            return Ok(objHttpCommonResponse);
+        }
+
+        [HttpPost]
+        [Route("Vender/AddStock/{SubProductId}")]
+        public dynamic Vender_AddStock([FromBody]int addStock, int SubProductId)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+
+
+                SubProductTbl sp = _dbContext.SubProductTbl.Find(SubProductId);
+                sp.Qty += addStock;
+                _dbContext.SaveChanges();
+
+
+
+                objInput.success = true;
+                objInput.message = "Successfully. ";
+                objInput.Data = sp;
+
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            return Ok(objHttpCommonResponse);
+        }
+
 
 
         #endregion
@@ -3777,6 +4450,13 @@ namespace ShopCart.Controllers
             InputData objInput = new InputData();
             try
             {
+
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+                int venderid = GetAuthId();
                 if (_dbContext.ProductMstr.Where(p => p.Sku == CustProductData.Sku).Any())
                 {
                     objInput.success = false;
@@ -3789,7 +4469,7 @@ namespace ShopCart.Controllers
 
                     ProductMstr newproduct = new ProductMstr();
                     newproduct.CatId = CustProductData.CatId;
-                    newproduct.VenderId = CustProductData.VenderId;
+                    newproduct.VenderId = venderid;
                     newproduct.Sku = CustProductData.Sku;
                     newproduct.Name = CustProductData.Name;
                     newproduct.Description = CustProductData.Description;
@@ -3813,40 +4493,40 @@ namespace ShopCart.Controllers
                     newproduct.CreateDt = DateTime.UtcNow;
                     newproduct.UpdateDt = DateTime.UtcNow;
                     _dbContext.ProductMstr.Add(newproduct);
-                    _dbContext.SaveChanges();
+                    //_dbContext.SaveChanges();
 
 
-                    foreach (CostSubProduct subProduct in CustProductData.SubProductTbl.ToList())
-                    {
-                        SubProductTbl newsubProduct = new SubProductTbl();
-                        newsubProduct.ProductId = newproduct.Id;
-                        newsubProduct.SizeId = subProduct.SizeId;
-                        newsubProduct.ColorId = subProduct.ColorId;
-                        newsubProduct.Price = subProduct.Price;
-                        newsubProduct.OfferPrice = subProduct.OfferPrice;
-                        newsubProduct.Qty = subProduct.Qty;
+                    //foreach (CostSubProduct subProduct in CustProductData.SubProductTbl.ToList())
+                    //{
+                    //    SubProductTbl newsubProduct = new SubProductTbl();
+                    //    newsubProduct.ProductId = newproduct.Id;
+                    //    newsubProduct.SizeId = subProduct.SizeId;
+                    //    newsubProduct.ColorId = subProduct.ColorId;
+                    //    newsubProduct.Price = subProduct.Price;
+                    //    newsubProduct.OfferPrice = subProduct.OfferPrice;
+                    //    newsubProduct.Qty = subProduct.Qty;
 
-                        newsubProduct.IsActive = true;
-                        newsubProduct.IsDeleted = false;
-                        newsubProduct.CreateDt = DateTime.UtcNow;
-                        newsubProduct.UpdateDt = DateTime.UtcNow;
-                        _dbContext.SubProductTbl.Add(newsubProduct);
-                        _dbContext.SaveChanges();
+                    //    newsubProduct.IsActive = true;
+                    //    newsubProduct.IsDeleted = false;
+                    //    newsubProduct.CreateDt = DateTime.UtcNow;
+                    //    newsubProduct.UpdateDt = DateTime.UtcNow;
+                    //    _dbContext.SubProductTbl.Add(newsubProduct);
+                    //    _dbContext.SaveChanges();
 
-                        foreach (CustProductImg pimg in subProduct.ProductImg.ToList())
-                        {
-                            ProductImg newProImg = new ProductImg();
-                            newProImg.SubProducatId = newsubProduct.Id;
-                            newProImg.Path = pimg.Path;
-                            newProImg.IsActive = true;
-                            newProImg.IsDeleted = false;
-                            newProImg.CreateDt = DateTime.UtcNow;
-                            newProImg.UpdateDt = DateTime.UtcNow;
-                            _dbContext.ProductImg.Add(newProImg);
-                            _dbContext.SaveChanges();
-                        }
+                    //    foreach (CustProductImg pimg in subProduct.ProductImg.ToList())
+                    //    {
+                    //        ProductImg newProImg = new ProductImg();
+                    //        newProImg.SubProducatId = newsubProduct.Id;
+                    //        newProImg.Path = pimg.Path;
+                    //        newProImg.IsActive = true;
+                    //        newProImg.IsDeleted = false;
+                    //        newProImg.CreateDt = DateTime.UtcNow;
+                    //        newProImg.UpdateDt = DateTime.UtcNow;
+                    //        _dbContext.ProductImg.Add(newProImg);
+                    //        _dbContext.SaveChanges();
+                    //    }
 
-                    }
+                    //}
 
 
                     //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
@@ -3871,6 +4551,7 @@ namespace ShopCart.Controllers
             //objHttpCommonResponse.AuthToken = objInput.AuthToken;
             return Ok(objHttpCommonResponse);
         }
+
 
 
         [HttpPost]
@@ -4142,6 +4823,69 @@ namespace ShopCart.Controllers
             //objHttpCommonResponse.AuthToken = objInput.AuthToken;
             return Ok(objHttpCommonResponse);
         }
+
+
+
+        [HttpGet]
+        [Route("subProduct/Getall/{productid}")]
+        public dynamic subProduct_Getall(int productid)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+                int venderid = GetAuthId();
+                if (!_dbContext.SubProductTbl.Where(p => p.ProductId == productid).Any())
+                {
+                    objInput.success = false;
+                    objInput.message = "sub Product not Exist!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+                    //(5 * 252 + 4 * 124 + 3 * 40 + 2 * 29 + 1 * 33) / (252 + 124 + 40 + 29 + 33) = 4.11 and change
+
+
+                    List<SubProductTbl>subProducts = _dbContext.SubProductTbl.Where(p => p.ProductId == productid).ToList();
+                    foreach (SubProductTbl subProduct in subProducts)
+                    {
+                        subProduct.Color = _dbContext.ColoursTbl.Find(subProduct.ColorId);
+                        subProduct.Size = _dbContext.SizesTbl.Find(subProduct.SizeId);
+                        foreach (ProductImg pimg in _dbContext.ProductImg.Where(p => p.SubProducatId == subProduct.Id).ToList())
+                        {
+                            subProduct.ProductImg.Add(pimg);
+                        }
+                    }
+
+                    //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
+                    //String xToken = objAdminData.Id.ToString() + "#" + objAdminData.UserName + "#" + tomorrow.ToString();
+                    //objInput.AuthToken = Encrypt(xToken);
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = subProducts;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+            return Ok(objHttpCommonResponse);
+        }
+
+
 
         [HttpGet]
         [Route("Product/GetAll/{VenderId}")]
@@ -4687,7 +5431,7 @@ namespace ShopCart.Controllers
             public bool IsReturnable { get; set; }
             public decimal ReturnDays { get; set; }
             public string Policy { get; set; }
-            public double CurrentRating { get; set; }
+            public decimal CurrentRating { get; set; }
             public int RatingCount { get; set; }
             public int ReviewCount { get; set; }
             public bool UserListing { get; set; }

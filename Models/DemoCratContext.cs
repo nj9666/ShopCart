@@ -437,9 +437,7 @@ namespace ShopCart.Models
 
                 entity.Property(e => e.OrderSubStatus).HasColumnName("order_sub_status");
 
-                entity.Property(e => e.Qty)
-                    .HasColumnName("qty")
-                    .HasColumnType("numeric(5, 0)");
+                entity.Property(e => e.Qty).HasColumnName("qty");
 
                 entity.Property(e => e.SubProducatId).HasColumnName("sub_producat_id");
 
@@ -598,7 +596,9 @@ namespace ShopCart.Models
                     .HasColumnName("create_dt")
                     .HasColumnType("datetime");
 
-                entity.Property(e => e.CurrentRating).HasColumnName("current_rating");
+                entity.Property(e => e.CurrentRating)
+                    .HasColumnName("current_rating")
+                    .HasColumnType("numeric(2, 1)");
 
                 entity.Property(e => e.Description)
                     .IsRequired()
@@ -1029,9 +1029,7 @@ namespace ShopCart.Models
 
                 entity.Property(e => e.Id).HasColumnName("id");
 
-                entity.Property(e => e.AddLine1)
-                    .IsRequired()
-                    .HasColumnName("add_line_1");
+                entity.Property(e => e.AddLine1).HasColumnName("add_line_1");
 
                 entity.Property(e => e.AddLine2).HasColumnName("add_line_2");
 
@@ -1043,9 +1041,7 @@ namespace ShopCart.Models
                     .HasColumnName("create_dt")
                     .HasColumnType("datetime");
 
-                entity.Property(e => e.DisplayBusinessDescription)
-                    .IsRequired()
-                    .HasColumnName("display_business_description");
+                entity.Property(e => e.DisplayBusinessDescription).HasColumnName("display_business_description");
 
                 entity.Property(e => e.DisplayBusinessName)
                     .IsRequired()
@@ -1062,7 +1058,6 @@ namespace ShopCart.Models
                 entity.Property(e => e.IsDeleted).HasColumnName("is_deleted");
 
                 entity.Property(e => e.Landmark)
-                    .IsRequired()
                     .HasColumnName("landmark")
                     .HasMaxLength(20);
 
@@ -1080,12 +1075,10 @@ namespace ShopCart.Models
                     .HasColumnType("numeric(10, 0)");
 
                 entity.Property(e => e.PreferredLanguage)
-                    .IsRequired()
                     .HasColumnName("preferred_language")
                     .HasMaxLength(20);
 
                 entity.Property(e => e.PreferredTimeSlot)
-                    .IsRequired()
                     .HasColumnName("preferred_time_slot")
                     .HasMaxLength(50);
 
@@ -1102,19 +1095,16 @@ namespace ShopCart.Models
                 entity.HasOne(d => d.City)
                     .WithMany(p => p.VenderMstr)
                     .HasForeignKey(d => d.CityId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("FK_vender_mstr_city_mstr");
 
                 entity.HasOne(d => d.Country)
                     .WithMany(p => p.VenderMstr)
                     .HasForeignKey(d => d.CountryId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("FK_vender_mstr_country_mstr");
 
                 entity.HasOne(d => d.State)
                     .WithMany(p => p.VenderMstr)
                     .HasForeignKey(d => d.StateId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("FK_vender_mstr_state_mstr");
             });
 

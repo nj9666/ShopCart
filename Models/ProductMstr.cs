@@ -22,7 +22,7 @@ namespace ShopCart.Models
         public bool IsReturnable { get; set; }
         public decimal ReturnDays { get; set; }
         public string Policy { get; set; }
-        public double CurrentRating { get; set; }
+        public decimal CurrentRating { get; set; }
         public int RatingCount { get; set; }
         public int ReviewCount { get; set; }
         public bool UserListing { get; set; }

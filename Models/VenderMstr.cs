@@ -25,11 +25,11 @@ namespace ShopCart.Models
         public string PreferredLanguage { get; set; }
         public string AddLine1 { get; set; }
         public string AddLine2 { get; set; }
-        public int CityId { get; set; }
-        public int StateId { get; set; }
-        public int CountryId { get; set; }
+        public int? CityId { get; set; }
+        public int? StateId { get; set; }
+        public int? CountryId { get; set; }
         public string Landmark { get; set; }
-        public decimal PinCode { get; set; }
+        public decimal? PinCode { get; set; }
         public DateTime CreateDt { get; set; }
         public DateTime UpdateDt { get; set; }
         public bool IsActive { get; set; }
