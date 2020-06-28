@@ -8,7 +8,7 @@ namespace ShopCart.Models
         public int Id { get; set; }
         public int UserId { get; set; }
         public int SubProducatId { get; set; }
-        public decimal Qty { get; set; }
+        public int Qty { get; set; }
         public DateTime CreateDt { get; set; }
         public DateTime UpdateDt { get; set; }
         public bool IsActive { get; set; }

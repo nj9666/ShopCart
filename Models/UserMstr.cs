@@ -8,7 +8,6 @@ namespace ShopCart.Models
         public UserMstr()
         {
             AddressTbl = new HashSet<AddressTbl>();
-            CardsTbl = new HashSet<CardsTbl>();
             CartTbl = new HashSet<CartTbl>();
             OrderTbl = new HashSet<OrderTbl>();
             RatingTbl = new HashSet<RatingTbl>();
@@ -34,7 +33,6 @@ namespace ShopCart.Models
         public bool IsDeleted { get; set; }
 
         public ICollection<AddressTbl> AddressTbl { get; set; }
-        public ICollection<CardsTbl> CardsTbl { get; set; }
         public ICollection<CartTbl> CartTbl { get; set; }
         public ICollection<OrderTbl> OrderTbl { get; set; }
         public ICollection<RatingTbl> RatingTbl { get; set; }

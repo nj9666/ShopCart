@@ -14,6 +14,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ShopCart.Models;
 using Microsoft.AspNetCore.Mvc.Cors.Internal;
+using Microsoft.Extensions.FileProviders;
+using System.IO;
+using Microsoft.AspNetCore.Http.Features;
 
 namespace ShopCart
 {
@@ -37,8 +40,14 @@ namespace ShopCart
                        .AllowAnyHeader();
             }));
 
+            services.Configure<FormOptions>(o => {
+                o.ValueLengthLimit = int.MaxValue;
+                o.MultipartBodyLengthLimit = int.MaxValue;
+                o.MemoryBufferThreshold = int.MaxValue;
+            });
+
             String connectionString = Configuration.GetConnectionString("DefaultConnection");
-            services.AddDbContext<DemoCratContext>(opt => opt.UseSqlServer(connectionString));
+            services.AddDbContext<DummyShopContext>(opt => opt.UseSqlServer(connectionString));
 
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
             services.AddMvc().AddJsonOptions(x => x.SerializerSettings.PreserveReferencesHandling = Newtonsoft.Json.PreserveReferencesHandling.Objects);
@@ -60,6 +69,18 @@ namespace ShopCart
             {
                 app.UseHsts();
             }
+
+
+
+            app.UseStaticFiles(); // For the wwwroot folder
+
+            app.UseStaticFiles(new StaticFileOptions
+            {
+                FileProvider = new PhysicalFileProvider(
+                    Path.Combine(Directory.GetCurrentDirectory(), "public")),
+                RequestPath = "/public"
+            });
+
 
             app.UseHttpsRedirection();
 

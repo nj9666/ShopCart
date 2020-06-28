@@ -111,4 +111,15 @@ namespace ShopCart.Models.VModels
         public byte OrderSubStatus { get; set; }
 
     }
+    public class ProductForVender
+    {
+        public int Id { get; set; }
+        public string pic { get; set; }
+        public string sku { get; set; }
+        public string catname { get; set; }
+        public string name { get; set; }
+        public decimal CurrentRating { get; set; }
+        public bool UserListing { get; set; }
+        public List<string> ColoursList { get; set; }
+    }
 }

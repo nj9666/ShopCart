@@ -13,6 +13,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.IO;
 using ShopCart.Models.VModels;
+using System.Net.Http.Headers;
 
 namespace ShopCart.Controllers
 {
@@ -23,14 +24,137 @@ namespace ShopCart.Controllers
 
         private const string DEFAULT_KEY = "#kl?~@<z";
 
-        private DemoCratContext _dbContext;
+        private DummyShopContext _dbContext;
+
+
+        public string TempPath = Path.Combine("public", "temp");
+        public string ImgPath = Path.Combine("public", "subproduct");
 
         HttpCommonResponse objHttpCommonResponse = new HttpCommonResponse();
 
-        public ShopAPIController(DemoCratContext context)
+        public ShopAPIController(DummyShopContext context)
         {
             _dbContext = context;
         }
+
+
+        private static Random random = new Random();
+
+
+        [HttpPost]
+        [Route("Upload_Image")]
+        public IActionResult Upload_Image()
+        {
+            const string chars = "abcdefghijklmnopqrstuvwxyz";
+            string tkn = new string(Enumerable.Repeat(chars, 5).Select(s => s[random.Next(s.Length)]).ToArray());
+            List<string> imgary = new List<string>();
+            InputData objInput = new InputData();
+            try
+            {
+                //foreach (var file in Request.Form.Files)
+                //{
+                //    var folderName = Path.Combine("public", "temp");
+                //    var imgname = "img_" + tkn + DateTime.UtcNow.ToString("yyyyMMddHHmmssffff");
+                //    var fileName = imgname + "." + ContentDispositionHeaderValue.Parse(file.ContentDisposition).FileName.Trim('"').Split(".")[1];
+
+                //    InputData resp = uploadfile(file, folderName, fileName, "Image");
+                //    if (resp.success.Value)
+                //    {
+                //        imgary.Add(resp.Data);
+                //    }
+                //}
+                var file = Request.Form.Files.First();
+                var folderName = Path.Combine("public", "temp");
+                var imgname = "img_" + tkn + DateTime.UtcNow.ToString("yyyyMMddHHmmssffff");
+                var fileName = imgname + "." + ContentDispositionHeaderValue.Parse(file.ContentDisposition).FileName.Trim('"').Split(".")[1];
+
+                InputData resp = uploadfile(file, folderName, fileName, "Image");
+                if (resp.success.Value)
+                {
+                    imgary.Add(resp.Data);
+                    objInput.success = true;
+                    objInput.message = "Successfully";
+                    objInput.Data = string.Join(",", imgary.ToArray());
+                }
+                else
+                {
+                    objInput = resp;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = string.Join(",", imgary.ToArray());
+            }
+
+            return StatusCode(200, objInput);
+        }
+        public InputData uploadfile(dynamic file, string folderName, string fileName, string UploadType)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                bool validformate = false;
+
+                if (UploadType == "Image")
+                {
+                    if (fileName.ToLower().Contains(".jpg") || fileName.ToLower().Contains(".jpeg") || fileName.ToLower().Contains(".png"))
+                    {
+                        validformate = true;
+                    }
+                }
+                else if (UploadType == "Video")
+                {
+
+                    if (fileName.ToLower().Contains(".mp4") || fileName.ToLower().Contains(".avi") || fileName.ToLower().Contains(".mkv"))
+                    {
+                        validformate = true;
+                    }
+                }
+
+                if (validformate)
+                {
+                    var pathToSave = Path.Combine(Directory.GetCurrentDirectory(), folderName);
+                    if (file.Length > 0)
+                    {
+                        var fullPath = Path.Combine(pathToSave, fileName);
+                        var dbPath = Path.Combine(folderName, fileName);
+                        using (var stream = new FileStream(fullPath, FileMode.Create))
+                        {
+                            file.CopyTo(stream);
+                        }
+
+                        objInput.success = true;
+                        objInput.message = "Successfully";
+                        objInput.Data = "temp/" + fileName;
+                    }
+                    else
+                    {
+                        objInput.success = false;
+                        objInput.message = "Problem during file uploading";
+                        objInput.Data = null;
+                    }
+                }
+                else
+                {
+                    objInput.success = false;
+                    objInput.message = "Invalid formate file..";
+                    objInput.Data = fileName;
+                }
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            return objInput;
+        }
+
 
 
         #region User Area
@@ -105,7 +229,16 @@ namespace ShopCart.Controllers
             InputData objInput = new InputData();
             try
             {
-                var Data = _dbContext.UserMstr.Where(p => (p.UserName == objUserData.UserName || p.ContactNumber == Decimal.Parse(objUserData.UserName)) && p.Password == objUserData.Password).ToList();
+                List<UserMstr> Data = new List<UserMstr>();
+                if (decimal.TryParse(objUserData.UserName, out _))
+                {
+                    Data = _dbContext.UserMstr.Where(p => (p.ContactNumber == Decimal.Parse(objUserData.UserName)) && p.Password == objUserData.Password).ToList();
+                }
+                else
+                {
+                    Data = _dbContext.UserMstr.Where(p => (p.UserName == objUserData.UserName) && p.Password == objUserData.Password).ToList();
+                }
+
 
                 if (Data.Count == 0)
                 {
@@ -117,12 +250,13 @@ namespace ShopCart.Controllers
                 {
                     if (Data[0].IsActive)
                     {
+                        Data[0].Password = null;
                         DateTime tomorrow = DateTime.UtcNow.AddHours(24);
                         string xToken = Data[0].Id.ToString() + "#" + Data[0].UserName + "#" + tomorrow.ToString();
 
                         objInput.success = true;
                         objInput.message = "Successfully.";
-                        objInput.Data = Data;
+                        objInput.Data = Data[0];
                         objInput.AuthToken = Encrypt(xToken);
                     }
                     else
@@ -246,288 +380,683 @@ namespace ShopCart.Controllers
             return Ok(objHttpCommonResponse);
         }
 
+        [HttpGet]
+        [Route("User/Layout/CategoryAll")]
+        public dynamic User_Layout_menu()
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                if (_dbContext.CategoryMstr.Count() <= 0)
+                {
+                    objInput.success = false;
+                    objInput.message = "Category is not avalable!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+                    List<CategoryMstr> dbCategory = _dbContext.CategoryMstr.OrderBy(p => p.PCatId).ToList();
+                    //List<VMCategoryMstr> vMCategories = new List<VMCategoryMstr>();
+                    //foreach (CategoryMstr cat in dbCategory)
+                    //{
+                    //    VMCategoryMstr vMCategory = new VMCategoryMstr();
+                    //    vMCategory.Id = cat.Id;
+                    //    vMCategory.PCatId = cat.PCatId;
+                    //    vMCategory.Name = cat.Name;
+                    //    vMCategories.Add(vMCategory);
+                    //}
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = dbCategory;
+                }
 
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            return Ok(objHttpCommonResponse);
+        }
+
+
+
+        [HttpGet]
+        [Route("User/Home/TopColl")]
+        public dynamic User_TopColl()
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                if (_dbContext.ProductMstr.Count() <= 0)
+                {
+                    objInput.success = false;
+                    objInput.message = "Product is not avalable!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+                    List<ProductMstr> products = _dbContext.ProductMstr.Where(p => p.SubProductTbl.Count > 0 && p.UserListing).OrderByDescending(p => p.CurrentRating).Take(8).ToList();
+
+
+
+                    if (products.Count > 0)
+                    {
+                        foreach (ProductMstr pro in products)
+                        {
+                            pro.SubProductTbl = _dbContext.SubProductTbl.Where(p => p.ProductId == pro.Id).ToList();
+                            foreach (SubProductTbl subPro in pro.SubProductTbl)
+                            {
+                                subPro.Color = _dbContext.ColoursTbl.Find(subPro.ColorId);
+                                subPro.ProductImg = _dbContext.ProductImg.Where(p => p.SubProducatId == subPro.Id).ToList();
+                            }
+                        }
+                        objInput.success = true;
+                        objInput.message = "Successfully. ";
+                        objInput.Data = products;
+                    }
+                    else
+                    {
+                        objInput.success = false;
+                        objInput.message = "No Product avalable. ";
+                        objInput.Data = null;
+                    }
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            return Ok(objHttpCommonResponse);
+        }
+
+
+        [HttpGet]
+        [Route("User/Home/TodayDeal")]
+        public dynamic User_TodayDeal()
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                if (_dbContext.ProductMstr.Count() <= 0)
+                {
+                    objInput.success = false;
+                    objInput.message = "Product is not avalable!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+                    List<TodayDealsTbl> todayDeals = _dbContext.TodayDealsTbl.Where(p => p.StartDate.Date == DateTime.Today.Date).ToList();
+
+                    //List<TodayDealsTbl> todayDeals = _dbContext.TodayDealsTbl.Where(p => p.StartDate.Date == DateTime.Parse("2020-06-30 00:00:00.000").Date).ToList();
+                    List<ProductMstr> dealproducts = new List<ProductMstr>();
+                    foreach (TodayDealsTbl td in todayDeals)
+                    {
+                        ProductMstr pm = _dbContext.ProductMstr.Where(p => p.Id == td.ProId && p.SubProductTbl.Count > 0 && p.UserListing).FirstOrDefault();
+                        if (pm != null)
+                        {
+                            dealproducts.Add(pm);
+                        }
+                    }
+
+
+
+                    if (dealproducts.Count > 0)
+                    {
+                        foreach (ProductMstr pro in dealproducts)
+                        {
+                            pro.SubProductTbl = _dbContext.SubProductTbl.Where(p => p.ProductId == pro.Id).ToList();
+                            foreach (SubProductTbl subPro in pro.SubProductTbl)
+                            {
+                                subPro.Color = _dbContext.ColoursTbl.Find(subPro.ColorId);
+                                subPro.ProductImg = _dbContext.ProductImg.Where(p => p.SubProducatId == subPro.Id).ToList();
+                            }
+                        }
+
+
+                        objInput.success = true;
+                        objInput.message = "Successfully. ";
+                        objInput.Data = dealproducts;
+                    }
+                    else
+                    {
+                        objInput.success = false;
+                        objInput.message = "No Product avalable. ";
+                        objInput.Data = null;
+                    }
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            return Ok(objHttpCommonResponse);
+        }
+
+
+
+        [HttpGet]
+        [Route("User/Home/NewProduct")]
+        public dynamic User_NewProduct()
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                if (_dbContext.ProductMstr.Count() <= 0)
+                {
+                    objInput.success = false;
+                    objInput.message = "Product is not avalable!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+                    List<ProductMstr> dealproducts = _dbContext.ProductMstr.Where(p => p.SubProductTbl.Count > 0 && p.UserListing).OrderByDescending(p => p.CreateDt).Take(8).ToList();
+                    //List<ProductMstr> dealproducts = new List<ProductMstr>();
+
+
+
+                    if (dealproducts.Count > 0)
+                    {
+                        foreach (ProductMstr pro in dealproducts)
+                        {
+                            pro.SubProductTbl = _dbContext.SubProductTbl.Where(p => p.ProductId == pro.Id).ToList();
+                            foreach (SubProductTbl subPro in pro.SubProductTbl)
+                            {
+                                subPro.Color = _dbContext.ColoursTbl.Find(subPro.ColorId);
+                                subPro.ProductImg = _dbContext.ProductImg.Where(p => p.SubProducatId == subPro.Id).ToList();
+                            }
+                        }
+
+
+                        objInput.success = true;
+                        objInput.message = "Successfully. ";
+                        objInput.Data = dealproducts;
+                    }
+                    else
+                    {
+                        objInput.success = false;
+                        objInput.message = "No Product avalable. ";
+                        objInput.Data = null;
+                    }
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            return Ok(objHttpCommonResponse);
+        }
+
+
+
+        [HttpGet]
+        [Route("User/Home/BestSellProduct")]
+        public dynamic User_BestSellProduct()
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                if (_dbContext.ProductMstr.Count() <= 0)
+                {
+                    objInput.success = false;
+                    objInput.message = "Product is not avalable!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+                    List<ProductMstr> dealproducts = new List<ProductMstr>();
+                    //List<ProductMstr> dealproducts = _dbContext.ProductMstr.Where(p => p.SubProductTbl.Count > 0 && p.UserListing).OrderByDescending(p => p.CreateDt).Take(8).ToList();
+
+                    List<orderByP> orderByPs = new List<orderByP>();
+                    var Order_ByProduct = _dbContext.OrderDetailsTbl.OrderBy(p => p.SubProducatId).GroupBy(p => p.SubProducatId);
+
+
+                    foreach (var gp in Order_ByProduct)
+                    {
+                        orderByP orderByP = new orderByP();
+                        foreach (OrderDetailsTbl item in gp)
+                        {
+                            var orderDetailsTbl = _dbContext.OrderDetailsTbl.Where(p => p.Id == item.Id).Select(ss => new
+                            {
+                                pic = ss.SubProducat.ProductImg.FirstOrDefault().Path,
+                                name = ss.SubProducat.Product.Name,
+                                sku = ss.SubProducat.Product.Sku,
+                                price = ss.SubProducat.Price,
+                                color = ss.SubProducat.Color.Name,
+                                size = ss.SubProducat.Size.Name,
+                            }).FirstOrDefault();
+
+                            orderByP.pic = orderDetailsTbl.pic;
+                            orderByP.name = orderDetailsTbl.name;
+                            orderByP.sku = orderDetailsTbl.sku;
+                            orderByP.price = orderDetailsTbl.price;
+                            orderByP.color = orderDetailsTbl.color;
+                            orderByP.size = orderDetailsTbl.size;
+
+                            orderByP.totalCount += 1;
+                        }
+                        orderByP.totalAmount = (orderByP.totalCount * orderByP.price);
+                        orderByPs.Add(orderByP);
+                    }
+
+                    var obpro = orderByPs.OrderByDescending(p => p.totalCount).GroupBy(p => p.sku).Take(8).ToList();
+
+
+                    foreach (var obp in obpro)
+                    {
+                        ProductMstr pro = _dbContext.ProductMstr.Where(p => p.Sku == obp.Key).Where(p => p.SubProductTbl.Count > 0 && p.UserListing).FirstOrDefault();
+                        if (pro != null)
+                        {
+                            dealproducts.Add(pro);
+                        }
+                    }
+
+
+                    if (dealproducts.Count > 0)
+                    {
+                        foreach (ProductMstr pro in dealproducts)
+                        {
+                            pro.SubProductTbl = _dbContext.SubProductTbl.Where(p => p.ProductId == pro.Id).ToList();
+                            foreach (SubProductTbl subPro in pro.SubProductTbl)
+                            {
+                                subPro.Color = _dbContext.ColoursTbl.Find(subPro.ColorId);
+                                subPro.ProductImg = _dbContext.ProductImg.Where(p => p.SubProducatId == subPro.Id).ToList();
+                            }
+                        }
+
+
+                        objInput.success = true;
+                        objInput.message = "Successfully. ";
+                        objInput.Data = dealproducts;
+                    }
+                    else
+                    {
+                        objInput.success = false;
+                        objInput.message = "No Product avalable. ";
+                        objInput.Data = null;
+                    }
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            return Ok(objHttpCommonResponse);
+        }
+
+
+        [HttpGet]
+        [Route("User/Category/{catid}")]
+        public dynamic User_Category_product(int catid)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                List<ProductMstr> products = new List<ProductMstr>();
+                if (_dbContext.CategoryMstr.Find(catid).PCatId == null)
+                {
+                    List<CategoryMstr> categories = _dbContext.CategoryMstr.Where(p => p.PCatId == catid).ToList();
+                    foreach (CategoryMstr cat in categories)
+                    {
+                        products.AddRange(_dbContext.ProductMstr.Where(p => p.SubProductTbl.Count > 0 && p.UserListing && p.CatId == cat.Id).OrderByDescending(p => p.CurrentRating).ToList());
+                    }
+                }
+                else
+                {
+                    products = _dbContext.ProductMstr.Where(p => p.SubProductTbl.Count > 0 && p.UserListing && p.CatId == catid).OrderByDescending(p => p.CurrentRating).ToList();
+                }
+
+
+
+                if (products.Count > 0)
+                {
+                    foreach (ProductMstr pro in products)
+                    {
+                        pro.SubProductTbl = _dbContext.SubProductTbl.Where(p => p.ProductId == pro.Id).ToList();
+                        foreach (SubProductTbl subPro in pro.SubProductTbl)
+                        {
+                            subPro.Color = _dbContext.ColoursTbl.Find(subPro.ColorId);
+                            subPro.ProductImg = _dbContext.ProductImg.Where(p => p.SubProducatId == subPro.Id).ToList();
+                        }
+                    }
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = products;
+                }
+                else
+                {
+                    objInput.success = false;
+                    objInput.message = "No Product avalable. ";
+                    objInput.Data = null;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            return Ok(objHttpCommonResponse);
+        }
 
 
 
 
 
         #region User Activity Area
+      
+        //[HttpPost]
+        //[Route("Card/Insert")]
+        //public dynamic Card_Insert([FromBody]CardsTbl objCardsData)
+        //{
+        //    InputData objInput = new InputData();
+        //    try
+        //    {
+        //        InputData objInputdd = new InputData();
+        //        if (!ValidateToken(ref objInputdd))
+        //        {
+        //            return Unauthorized();
+        //        }
+        //        if (_dbContext.CardsTbl.Where(p => p.CardNumber == objCardsData.CardNumber && p.UserId == objCardsData.UserId).Any())
+        //        {
+        //            objInput.success = false;
+        //            objInput.message = "Cards is already register!!";
+        //            objInput.Data = null;
+        //        }
+        //        else
+        //        {
 
-        [HttpPost]
-        [Route("Card/Insert")]
-        public dynamic Card_Insert([FromBody]CardsTbl objCardsData)
-        {
-            InputData objInput = new InputData();
-            try
-            {
-                InputData objInputdd = new InputData();
-                if (!ValidateToken(ref objInputdd))
-                {
-                    return Unauthorized();
-                }
-                if (_dbContext.CardsTbl.Where(p => p.CardNumber == objCardsData.CardNumber && p.UserId == objCardsData.UserId).Any())
-                {
-                    objInput.success = false;
-                    objInput.message = "Cards is already register!!";
-                    objInput.Data = null;
-                }
-                else
-                {
+        //            objCardsData.IsActive = true;
+        //            objCardsData.IsDeleted = false;
+        //            objCardsData.CreateDt = DateTime.UtcNow;
+        //            objCardsData.UpdateDt = DateTime.UtcNow;
+        //            _dbContext.CardsTbl.Add(objCardsData);
+        //            _dbContext.SaveChanges();
 
-                    objCardsData.IsActive = true;
-                    objCardsData.IsDeleted = false;
-                    objCardsData.CreateDt = DateTime.UtcNow;
-                    objCardsData.UpdateDt = DateTime.UtcNow;
-                    _dbContext.CardsTbl.Add(objCardsData);
-                    _dbContext.SaveChanges();
+        //            //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
+        //            //String xToken = objCardsData.Id.ToString() + "#" + objCardsData.UserName + "#" + tomorrow.ToString();
+        //            //objInput.AuthToken = Encrypt(xToken);
+        //            objInput.success = true;
+        //            objInput.message = "Successfully. ";
+        //            objInput.Data = objCardsData;
+        //        }
 
-                    //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
-                    //String xToken = objCardsData.Id.ToString() + "#" + objCardsData.UserName + "#" + tomorrow.ToString();
-                    //objInput.AuthToken = Encrypt(xToken);
-                    objInput.success = true;
-                    objInput.message = "Successfully. ";
-                    objInput.Data = objCardsData;
-                }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        objInput.success = false;
+        //        objInput.message = "Something went wrong, please contact support";
+        //        objInput.Data = null;
+        //    }
 
-            }
-            catch (Exception ex)
-            {
-                objInput.success = false;
-                objInput.message = "Something went wrong, please contact support";
-                objInput.Data = null;
-            }
+        //    objHttpCommonResponse.success = objInput.success;
+        //    objHttpCommonResponse.message = objInput.message;
+        //    objHttpCommonResponse.data = objInput.Data;
+        //    //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+        //    return Ok(objHttpCommonResponse);
+        //}
 
-            objHttpCommonResponse.success = objInput.success;
-            objHttpCommonResponse.message = objInput.message;
-            objHttpCommonResponse.data = objInput.Data;
-            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
-            return Ok(objHttpCommonResponse);
-        }
+        //[HttpPost]
+        //[Route("Card/Edit/{CardId}")]
+        //public dynamic Card_Edit([FromBody]CardsTbl objCardsData, int CardId)
+        //{
+        //    InputData objInput = new InputData();
+        //    try
+        //    {
+        //        if (_dbContext.CardsTbl.Where(p => p.Id == CardId).Any())
+        //        {
+        //            objInput.success = false;
+        //            objInput.message = "Cards is ont Exist!!";
+        //            objInput.Data = null;
+        //        }
+        //        else if (_dbContext.CardsTbl.Where(p => p.CardNumber == objCardsData.CardNumber && p.UserId == objCardsData.UserId).Any())
+        //        {
+        //            objInput.success = false;
+        //            objInput.message = "Cards is already register!!";
+        //            objInput.Data = null;
+        //        }
+        //        else
+        //        {
+        //            CardsTbl dbobjCards = _dbContext.CardsTbl.Find(CardId);
+        //            dbobjCards.CardNumber = objCardsData.CardNumber == 0 ? dbobjCards.CardNumber : objCardsData.CardNumber;
+        //            dbobjCards.ExMonth = objCardsData.ExMonth == 0 ? dbobjCards.ExMonth : objCardsData.ExMonth;
+        //            dbobjCards.ExYear = objCardsData.ExYear == 0 ? dbobjCards.ExYear : objCardsData.ExYear;
+        //            dbobjCards.HolderName = objCardsData.HolderName == null ? dbobjCards.HolderName : objCardsData.HolderName;
+        //            dbobjCards.CardLabel = objCardsData.CardLabel == null ? dbobjCards.CardLabel : objCardsData.CardLabel;
+        //            dbobjCards.UpdateDt = DateTime.UtcNow;
+        //            _dbContext.SaveChanges();
 
-        [HttpPost]
-        [Route("Card/Edit/{CardId}")]
-        public dynamic Card_Edit([FromBody]CardsTbl objCardsData, int CardId)
-        {
-            InputData objInput = new InputData();
-            try
-            {
-                if (_dbContext.CardsTbl.Where(p => p.Id == CardId).Any())
-                {
-                    objInput.success = false;
-                    objInput.message = "Cards is ont Exist!!";
-                    objInput.Data = null;
-                }
-                else if (_dbContext.CardsTbl.Where(p => p.CardNumber == objCardsData.CardNumber && p.UserId == objCardsData.UserId).Any())
-                {
-                    objInput.success = false;
-                    objInput.message = "Cards is already register!!";
-                    objInput.Data = null;
-                }
-                else
-                {
-                    CardsTbl dbobjCards = _dbContext.CardsTbl.Find(CardId);
-                    dbobjCards.CardNumber = objCardsData.CardNumber == 0 ? dbobjCards.CardNumber : objCardsData.CardNumber;
-                    dbobjCards.ExMonth = objCardsData.ExMonth == 0 ? dbobjCards.ExMonth : objCardsData.ExMonth;
-                    dbobjCards.ExYear = objCardsData.ExYear == 0 ? dbobjCards.ExYear : objCardsData.ExYear;
-                    dbobjCards.HolderName = objCardsData.HolderName == null ? dbobjCards.HolderName : objCardsData.HolderName;
-                    dbobjCards.CardLabel = objCardsData.CardLabel == null ? dbobjCards.CardLabel : objCardsData.CardLabel;
-                    dbobjCards.UpdateDt = DateTime.UtcNow;
-                    _dbContext.SaveChanges();
+        //            //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
+        //            //String xToken = objCardsData.Id.ToString() + "#" + objCardsData.UserName + "#" + tomorrow.ToString();
+        //            //objInput.AuthToken = Encrypt(xToken);
+        //            objInput.success = true;
+        //            objInput.message = "Successfully. ";
+        //            objInput.Data = dbobjCards;
+        //        }
 
-                    //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
-                    //String xToken = objCardsData.Id.ToString() + "#" + objCardsData.UserName + "#" + tomorrow.ToString();
-                    //objInput.AuthToken = Encrypt(xToken);
-                    objInput.success = true;
-                    objInput.message = "Successfully. ";
-                    objInput.Data = dbobjCards;
-                }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        objInput.success = false;
+        //        objInput.message = "Something went wrong, please contact support";
+        //        objInput.Data = null;
+        //    }
 
-            }
-            catch (Exception ex)
-            {
-                objInput.success = false;
-                objInput.message = "Something went wrong, please contact support";
-                objInput.Data = null;
-            }
+        //    objHttpCommonResponse.success = objInput.success;
+        //    objHttpCommonResponse.message = objInput.message;
+        //    objHttpCommonResponse.data = objInput.Data;
+        //    //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+        //    return Ok(objHttpCommonResponse);
+        //}
 
-            objHttpCommonResponse.success = objInput.success;
-            objHttpCommonResponse.message = objInput.message;
-            objHttpCommonResponse.data = objInput.Data;
-            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
-            return Ok(objHttpCommonResponse);
-        }
+        //[HttpPost]
+        //[Route("Card/Remove/{CardId}")]
+        //public dynamic Card_Remove(int CardId)
+        //{
+        //    InputData objInput = new InputData();
+        //    try
+        //    {
+        //        if (_dbContext.CardsTbl.Where(p => p.Id == CardId).Any())
+        //        {
+        //            objInput.success = false;
+        //            objInput.message = "Cards is ont Exist!!";
+        //            objInput.Data = null;
+        //        }
 
-        [HttpPost]
-        [Route("Card/Remove/{CardId}")]
-        public dynamic Card_Remove(int CardId)
-        {
-            InputData objInput = new InputData();
-            try
-            {
-                if (_dbContext.CardsTbl.Where(p => p.Id == CardId).Any())
-                {
-                    objInput.success = false;
-                    objInput.message = "Cards is ont Exist!!";
-                    objInput.Data = null;
-                }
+        //        else
+        //        {
+        //            CardsTbl objCardsData = _dbContext.CardsTbl.Find(CardId);
+        //            objCardsData.IsActive = false;
+        //            objCardsData.IsDeleted = true;
+        //            objCardsData.UpdateDt = DateTime.UtcNow;
+        //            _dbContext.SaveChanges();
 
-                else
-                {
-                    CardsTbl objCardsData = _dbContext.CardsTbl.Find(CardId);
-                    objCardsData.IsActive = false;
-                    objCardsData.IsDeleted = true;
-                    objCardsData.UpdateDt = DateTime.UtcNow;
-                    _dbContext.SaveChanges();
+        //            //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
+        //            //String xToken = objCardsData.Id.ToString() + "#" + objCardsData.UserName + "#" + tomorrow.ToString();
+        //            //objInput.AuthToken = Encrypt(xToken);
+        //            objInput.success = true;
+        //            objInput.message = "Successfully. ";
+        //            objInput.Data = objCardsData;
+        //        }
 
-                    //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
-                    //String xToken = objCardsData.Id.ToString() + "#" + objCardsData.UserName + "#" + tomorrow.ToString();
-                    //objInput.AuthToken = Encrypt(xToken);
-                    objInput.success = true;
-                    objInput.message = "Successfully. ";
-                    objInput.Data = objCardsData;
-                }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        objInput.success = false;
+        //        objInput.message = "Something went wrong, please contact support";
+        //        objInput.Data = null;
+        //    }
 
-            }
-            catch (Exception ex)
-            {
-                objInput.success = false;
-                objInput.message = "Something went wrong, please contact support";
-                objInput.Data = null;
-            }
+        //    objHttpCommonResponse.success = objInput.success;
+        //    objHttpCommonResponse.message = objInput.message;
+        //    objHttpCommonResponse.data = objInput.Data;
+        //    //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+        //    return Ok(objHttpCommonResponse);
+        //}
 
-            objHttpCommonResponse.success = objInput.success;
-            objHttpCommonResponse.message = objInput.message;
-            objHttpCommonResponse.data = objInput.Data;
-            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
-            return Ok(objHttpCommonResponse);
-        }
+        //[HttpGet]
+        //[Route("Card/Get/{CardId}")]
+        //public dynamic Card_Get(int CardId)
+        //{
+        //    InputData objInput = new InputData();
+        //    try
+        //    {
+        //        if (_dbContext.CardsTbl.Where(p => p.Id == CardId).Any())
+        //        {
+        //            objInput.success = false;
+        //            objInput.message = "Cards is ont Exist!!";
+        //            objInput.Data = null;
+        //        }
 
-        [HttpGet]
-        [Route("Card/Get/{CardId}")]
-        public dynamic Card_Get(int CardId)
-        {
-            InputData objInput = new InputData();
-            try
-            {
-                if (_dbContext.CardsTbl.Where(p => p.Id == CardId).Any())
-                {
-                    objInput.success = false;
-                    objInput.message = "Cards is ont Exist!!";
-                    objInput.Data = null;
-                }
+        //        else
+        //        {
+        //            CardsTbl objCardsData = _dbContext.CardsTbl.Find(CardId);
 
-                else
-                {
-                    CardsTbl objCardsData = _dbContext.CardsTbl.Find(CardId);
+        //            //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
+        //            //String xToken = objCardsData.Id.ToString() + "#" + objCardsData.UserName + "#" + tomorrow.ToString();
+        //            //objInput.AuthToken = Encrypt(xToken);
+        //            objInput.success = true;
+        //            objInput.message = "Successfully. ";
+        //            objInput.Data = objCardsData;
+        //        }
 
-                    //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
-                    //String xToken = objCardsData.Id.ToString() + "#" + objCardsData.UserName + "#" + tomorrow.ToString();
-                    //objInput.AuthToken = Encrypt(xToken);
-                    objInput.success = true;
-                    objInput.message = "Successfully. ";
-                    objInput.Data = objCardsData;
-                }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        objInput.success = false;
+        //        objInput.message = "Something went wrong, please contact support";
+        //        objInput.Data = null;
+        //    }
 
-            }
-            catch (Exception ex)
-            {
-                objInput.success = false;
-                objInput.message = "Something went wrong, please contact support";
-                objInput.Data = null;
-            }
+        //    objHttpCommonResponse.success = objInput.success;
+        //    objHttpCommonResponse.message = objInput.message;
+        //    objHttpCommonResponse.data = objInput.Data;
+        //    //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+        //    return Ok(objHttpCommonResponse);
+        //}
 
-            objHttpCommonResponse.success = objInput.success;
-            objHttpCommonResponse.message = objInput.message;
-            objHttpCommonResponse.data = objInput.Data;
-            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
-            return Ok(objHttpCommonResponse);
-        }
+        //[HttpGet]
+        //[Route("Card/GetAll/My")]
+        //public dynamic Card_GetAll()
+        //{
+        //    InputData objInput = new InputData();
+        //    try
+        //    {
+        //        int UserId = 2;
+        //        if (!_dbContext.CardsTbl.Where(p => p.UserId == UserId).Any())
+        //        {
+        //            objInput.success = false;
+        //            objInput.message = "Cards is ont Exist!!";
+        //            objInput.Data = null;
+        //        }
 
-        [HttpGet]
-        [Route("Card/GetAll/My")]
-        public dynamic Card_GetAll()
-        {
-            InputData objInput = new InputData();
-            try
-            {
-                int UserId = 2;
-                if (!_dbContext.CardsTbl.Where(p => p.UserId == UserId).Any())
-                {
-                    objInput.success = false;
-                    objInput.message = "Cards is ont Exist!!";
-                    objInput.Data = null;
-                }
+        //        else
+        //        {
 
-                else
-                {
+        //            List<CardsTbl> objCardsData = _dbContext.CardsTbl.Where(p => p.UserId == UserId).ToList();
 
-                    List<CardsTbl> objCardsData = _dbContext.CardsTbl.Where(p => p.UserId == UserId).ToList();
+        //            //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
+        //            //String xToken = objCardsData.Id.ToString() + "#" + objCardsData.UserName + "#" + tomorrow.ToString();
+        //            //objInput.AuthToken = Encrypt(xToken);
+        //            objInput.success = true;
+        //            objInput.message = "Successfully. ";
+        //            objInput.Data = objCardsData;
+        //        }
 
-                    //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
-                    //String xToken = objCardsData.Id.ToString() + "#" + objCardsData.UserName + "#" + tomorrow.ToString();
-                    //objInput.AuthToken = Encrypt(xToken);
-                    objInput.success = true;
-                    objInput.message = "Successfully. ";
-                    objInput.Data = objCardsData;
-                }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        objInput.success = false;
+        //        objInput.message = "Something went wrong, please contact support";
+        //        objInput.Data = null;
+        //    }
 
-            }
-            catch (Exception ex)
-            {
-                objInput.success = false;
-                objInput.message = "Something went wrong, please contact support";
-                objInput.Data = null;
-            }
-
-            objHttpCommonResponse.success = objInput.success;
-            objHttpCommonResponse.message = objInput.message;
-            objHttpCommonResponse.data = objInput.Data;
-            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
-            return Ok(objHttpCommonResponse);
-        }
+        //    objHttpCommonResponse.success = objInput.success;
+        //    objHttpCommonResponse.message = objInput.message;
+        //    objHttpCommonResponse.data = objInput.Data;
+        //    //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+        //    return Ok(objHttpCommonResponse);
+        //}
 
 
-        [HttpGet]
-        [Route("Card/Get/Default")]
-        public dynamic Card_Get()
-        {
-            InputData objInput = new InputData();
-            try
-            {
-                int UserId = 2;
-                if (!_dbContext.CardsTbl.Where(p => p.UserId == UserId && p.IsDefault == true).Any())
-                {
-                    objInput.success = false;
-                    objInput.message = "Cards is ont Exist!!";
-                    objInput.Data = null;
-                }
-                else
-                {
-                    CardsTbl objCardsData = _dbContext.CardsTbl.Where(p => p.UserId == UserId && p.IsDefault == true).FirstOrDefault();
+        //[HttpGet]
+        //[Route("Card/Get/Default")]
+        //public dynamic Card_Get()
+        //{
+        //    InputData objInput = new InputData();
+        //    try
+        //    {
+        //        int UserId = 2;
+        //        if (!_dbContext.CardsTbl.Where(p => p.UserId == UserId && p.IsDefault == true).Any())
+        //        {
+        //            objInput.success = false;
+        //            objInput.message = "Cards is ont Exist!!";
+        //            objInput.Data = null;
+        //        }
+        //        else
+        //        {
+        //            CardsTbl objCardsData = _dbContext.CardsTbl.Where(p => p.UserId == UserId && p.IsDefault == true).FirstOrDefault();
 
-                    //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
-                    //String xToken = objCardsData.Id.ToString() + "#" + objCardsData.UserName + "#" + tomorrow.ToString();
-                    //objInput.AuthToken = Encrypt(xToken);
-                    objInput.success = true;
-                    objInput.message = "Successfully. ";
-                    objInput.Data = objCardsData;
-                }
+        //            //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
+        //            //String xToken = objCardsData.Id.ToString() + "#" + objCardsData.UserName + "#" + tomorrow.ToString();
+        //            //objInput.AuthToken = Encrypt(xToken);
+        //            objInput.success = true;
+        //            objInput.message = "Successfully. ";
+        //            objInput.Data = objCardsData;
+        //        }
 
-            }
-            catch (Exception ex)
-            {
-                objInput.success = false;
-                objInput.message = "Something went wrong, please contact support";
-                objInput.Data = null;
-            }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        objInput.success = false;
+        //        objInput.message = "Something went wrong, please contact support";
+        //        objInput.Data = null;
+        //    }
 
-            objHttpCommonResponse.success = objInput.success;
-            objHttpCommonResponse.message = objInput.message;
-            objHttpCommonResponse.data = objInput.Data;
-            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
-            return Ok(objHttpCommonResponse);
-        }
+        //    objHttpCommonResponse.success = objInput.success;
+        //    objHttpCommonResponse.message = objInput.message;
+        //    objHttpCommonResponse.data = objInput.Data;
+        //    //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+        //    return Ok(objHttpCommonResponse);
+        //}
 
 
         [HttpPost]
@@ -600,7 +1129,6 @@ namespace ShopCart.Controllers
                     dbobjAddresss.Landmark = objAddresssData.Landmark == null ? dbobjAddresss.Landmark : objAddresssData.Landmark;
                     dbobjAddresss.Zip = objAddresssData.Zip == 0 ? dbobjAddresss.Zip : objAddresssData.Zip;
                     dbobjAddresss.Type = objAddresssData.Type == 0 ? dbobjAddresss.Type : objAddresssData.Type;
-                    dbobjAddresss.Mobile = objAddresssData.Mobile == 0 ? dbobjAddresss.Mobile : objAddresssData.Mobile;
                     dbobjAddresss.UpdateDt = DateTime.UtcNow;
                     _dbContext.SaveChanges();
 
@@ -720,7 +1248,13 @@ namespace ShopCart.Controllers
             InputData objInput = new InputData();
             try
             {
-                int UserId = 2;
+
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+                int UserId = GetAuthId();
                 if (!_dbContext.AddressTbl.Where(p => p.UserId == UserId && p.IsDeleted == false).Any())
                 {
                     objInput.success = false;
@@ -732,7 +1266,12 @@ namespace ShopCart.Controllers
                 {
 
                     List<AddressTbl> objAddresssData = _dbContext.AddressTbl.Where(p => p.UserId == UserId && p.IsDeleted == false).ToList();
-
+                    foreach (AddressTbl add in objAddresssData)
+                    {
+                        add.City = _dbContext.CityMstr.Find(add.CityId);
+                        add.State = _dbContext.StateMstr.Find(add.StateId);
+                        add.Country = _dbContext.CountryMstr.Find(add.CountryId);
+                    }
                     //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
                     //String xToken = objAddresssData.Id.ToString() + "#" + objAddresssData.UserName + "#" + tomorrow.ToString();
                     //objInput.AuthToken = Encrypt(xToken);
@@ -958,7 +1497,7 @@ namespace ShopCart.Controllers
                     objInput.message = "you are not able to this!!";
                     objInput.Data = null;
                 }
-                else if (_dbContext.CardsTbl.Where(p => p.Id == CartId && p.UserId == UserId).Any())
+                else if (_dbContext.CartTbl.Where(p => p.Id == CartId && p.UserId == UserId).Any())
                 {
                     objInput.success = false;
                     objInput.message = "Cart Item is not Exist!!";
@@ -1015,7 +1554,7 @@ namespace ShopCart.Controllers
                     objInput.message = "you are not able to this!!";
                     objInput.Data = null;
                 }
-                else if (_dbContext.CardsTbl.Where(p => p.Id == CartId && p.UserId == UserId).Any())
+                else if (_dbContext.CartTbl.Where(p => p.Id == CartId && p.UserId == UserId).Any())
                 {
                     objInput.success = false;
                     objInput.message = "Cart Item is not Exist!!";
@@ -1070,9 +1609,9 @@ namespace ShopCart.Controllers
                     objInput.message = "you are not able to this!!";
                     objInput.Data = null;
                 }
-                else if (!_dbContext.WishlistTbl.Where(p => p.UserId == UserId).Any())
+                else if (!_dbContext.CartTbl.Where(p => p.UserId == UserId).Any())
                 {
-                    objInput.success = false;
+                    objInput.success = true;
                     objInput.message = "Cart List is Empty!!";
                     objInput.Data = null;
                 }
@@ -1080,6 +1619,29 @@ namespace ShopCart.Controllers
                 {
 
                     List<CartTbl> carts = _dbContext.CartTbl.Where(p => p.UserId == UserId).ToList();
+                    foreach (CartTbl cart in carts)
+                    {
+                        SubProductTbl sp = _dbContext.SubProductTbl.Find(cart.SubProducatId);
+                        sp.Product = _dbContext.ProductMstr.Find(sp.ProductId);
+                        sp.Color = _dbContext.ColoursTbl.Find(sp.ColorId);
+                        sp.Size = _dbContext.SizesTbl.Find(sp.SizeId);
+                        sp.ProductImg = _dbContext.ProductImg.Where(p => p.SubProducatId == sp.Id).ToList();
+
+                        TodayDealsTbl dealsTbl = _dbContext.TodayDealsTbl.Where(p => p.ProId == sp.ProductId && p.StartDate.Date == DateTime.Today.Date).FirstOrDefault();
+                        if (dealsTbl != null)
+                        {
+                            if (dealsTbl.DiscountType == 1)
+                            {
+                                sp.Price -= dealsTbl.DiscountAmount;
+                            }
+                            else if (dealsTbl.DiscountType == 2)
+                            {
+                                var discount = (sp.Price * dealsTbl.DiscountAmount) / 100;
+                                sp.Price -= discount;
+                            }
+                        }
+                        cart.SubProducat = sp;
+                    }
 
                     //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
                     //String xToken = objAdminData.Id.ToString() + "#" + objAdminData.UserName + "#" + tomorrow.ToString();
@@ -1276,23 +1838,70 @@ namespace ShopCart.Controllers
 
 
         [HttpPost]
-        [Route("Order/Place")]
-        public dynamic Order_Place([FromBody]OrderTbl objOrderData)
+        [Route("Order/Place/{AddressId}/{CpCode}")]
+        public dynamic Order_Place(int AddressId, string CpCode)
         {
             InputData objInput = new InputData();
             try
             {
-                objOrderData.IsActive = true;
-                objOrderData.IsDeleted = false;
-                objOrderData.CreateDt = DateTime.UtcNow;
-                objOrderData.UpdateDt = DateTime.UtcNow;
-                _dbContext.OrderTbl.Add(objOrderData);
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+
+                int UserId = GetAuthId();
+
+                OrderTbl NewOrder = new OrderTbl();
+                NewOrder.OrderIdV = Convert.ToInt64(DateTime.UtcNow.ToString("yyyyMMddHHmmssffff"));
+                NewOrder.UserId = UserId;
+
+                List<CartTbl> items = _dbContext.CartTbl.Where(p => p.UserId == UserId).ToList();
+                foreach (CartTbl item in items)
+                {
+                    NewOrder.TotalQty += item.Qty;
+                    NewOrder.TotalPrice += _dbContext.SubProductTbl.Find(item.SubProducatId).Price * item.Qty;
+                    _dbContext.CartTbl.Remove(item);
+                }
+                NewOrder.AddressId = AddressId;
+                CouponMstr activeCoupon = _dbContext.CouponMstr.Where(p => p.CoupCode == CpCode).FirstOrDefault();
+                if (activeCoupon == null)
+                {
+                    NewOrder.CouponCode = 0;
+                }
+                else
+                {
+                    if (activeCoupon.DiscountType == 1)
+                    {
+                        NewOrder.TotalPrice -= Convert.ToDecimal(activeCoupon.DiscountAmount);
+                    }
+                    else if (activeCoupon.DiscountType == 2)
+                    {
+                        var discount = (NewOrder.TotalPrice * Convert.ToDecimal(activeCoupon.DiscountAmount)) / 100;
+                        NewOrder.TotalPrice -= discount;
+                    }
+                    NewOrder.CouponCode = activeCoupon.Id;
+                }
+                NewOrder.Status = 1;
+
+                NewOrder.IsActive = true;
+                NewOrder.IsDeleted = false;
+                NewOrder.CreateDt = DateTime.UtcNow;
+                NewOrder.UpdateDt = DateTime.UtcNow;
+                _dbContext.OrderTbl.Add(NewOrder);
 
                 _dbContext.SaveChanges();
 
-                foreach (OrderDetailsTbl ODT in objOrderData.OrderDetailsTbl)
+                foreach (CartTbl item in items)
                 {
-                    ODT.OrderId = objOrderData.Id;
+
+                    OrderDetailsTbl ODT = new OrderDetailsTbl();
+                    ODT.OrderId = NewOrder.Id;
+                    ODT.SubProducatId = item.SubProducatId;
+                    ODT.Qty = item.Qty;
+                    ODT.OrderSubStatus = 1;
+                    ODT.VenderPaymantStatus = 1;
+
                     ODT.IsActive = true;
                     ODT.IsDeleted = false;
                     ODT.CreateDt = DateTime.UtcNow;
@@ -1309,8 +1918,169 @@ namespace ShopCart.Controllers
                 //objInput.AuthToken = Encrypt(xToken);
                 objInput.success = true;
                 objInput.message = "Successfully. ";
-                objInput.Data = objOrderData;
+                objInput.Data = NewOrder;
 
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+            return Ok(objHttpCommonResponse);
+        }
+
+        [HttpPost]
+        [Route("Order/Place/{AddressId}")]
+        public dynamic Order_Place(int AddressId)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+                int UserId = GetAuthId();
+
+                OrderTbl NewOrder = new OrderTbl();
+                NewOrder.OrderIdV = Convert.ToInt64(DateTime.UtcNow.ToString("yyyyMMddHHmmssffff"));
+                NewOrder.UserId = UserId;
+
+                List<CartTbl> items = _dbContext.CartTbl.Where(p => p.UserId == UserId).ToList();
+                foreach (CartTbl item in items)
+                {
+                    NewOrder.TotalQty += item.Qty;
+                    NewOrder.TotalPrice += _dbContext.SubProductTbl.Find(item.SubProducatId).Price * item.Qty;
+
+                    _dbContext.CartTbl.Remove(item);
+                }
+                NewOrder.AddressId = AddressId;
+                NewOrder.CouponCode = null;
+                NewOrder.Status = 0;
+
+                NewOrder.IsActive = true;
+                NewOrder.IsDeleted = false;
+                NewOrder.CreateDt = DateTime.UtcNow;
+                NewOrder.UpdateDt = DateTime.UtcNow;
+                _dbContext.OrderTbl.Add(NewOrder);
+
+                _dbContext.SaveChanges();
+
+                foreach (CartTbl item in items)
+                {
+
+                    OrderDetailsTbl ODT = new OrderDetailsTbl();
+                    ODT.OrderId = NewOrder.Id;
+                    ODT.SubProducatId = item.SubProducatId;
+                    ODT.Qty = item.Qty;
+                    ODT.OrderSubStatus = 0;
+                    ODT.VenderPaymantStatus = 0;
+
+                    ODT.IsActive = true;
+                    ODT.IsDeleted = false;
+                    ODT.CreateDt = DateTime.UtcNow;
+                    ODT.UpdateDt = DateTime.UtcNow;
+                    _dbContext.OrderDetailsTbl.Add(ODT);
+
+                    _dbContext.SaveChanges();
+                }
+
+
+
+                //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
+                //String xToken = objOrderData.Id.ToString() + "#" + objOrderData.UserName + "#" + tomorrow.ToString();
+                //objInput.AuthToken = Encrypt(xToken);
+                objInput.success = true;
+                objInput.message = "Successfully. ";
+                objInput.Data = NewOrder;
+
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+            return Ok(objHttpCommonResponse);
+        }
+        [HttpPost]
+        [Route("Order/payment")]
+        public dynamic Order_payment([FromBody]PaymentTbl objpamentData)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+            return Ok(objHttpCommonResponse);
+        }
+
+        [HttpGet]
+        [Route("Order/Get/{orderid}")]
+        public dynamic order_Get(long orderid)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                //orderid = 30825127;
+                if (!_dbContext.OrderTbl.Where(p => p.OrderIdV == orderid).Any())
+                {
+                    objInput.success = false;
+                    objInput.message = "order List is Empty!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+
+                    OrderTbl order = _dbContext.OrderTbl.Where(p => p.OrderIdV == orderid).FirstOrDefault();
+                    order.OrderDetailsTbl = _dbContext.OrderDetailsTbl.Where(p => p.OrderId == order.Id).ToList();
+                    foreach (OrderDetailsTbl odt in order.OrderDetailsTbl)
+                    {
+                        SubProductTbl sp = _dbContext.SubProductTbl.Find(odt.SubProducatId);
+                        sp.ProductImg = _dbContext.ProductImg.Where(p => p.SubProducatId == sp.Id).ToList();
+                        sp.Product = _dbContext.ProductMstr.Find(sp.ProductId);
+                        
+                        odt.SubProducat = sp;
+                    }
+                    order.User = _dbContext.UserMstr.Find(order.UserId);
+                    AddressTbl add = _dbContext.AddressTbl.Find(order.AddressId);
+                    add.City = _dbContext.CityMstr.Find(add.CityId);
+                    add.State = _dbContext.StateMstr.Find(add.StateId);
+                    add.Country = _dbContext.CountryMstr.Find(add.CountryId);
+                    order.CouponCodeNavigation = _dbContext.CouponMstr.Find(order.CouponCode);
+                    order.Address = add;
+
+                    //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
+                    //String xToken = objAdminData.Id.ToString() + "#" + objAdminData.UserName + "#" + tomorrow.ToString();
+                    //objInput.AuthToken = Encrypt(xToken);
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = order;
+                }
 
             }
             catch (Exception ex)
@@ -1900,14 +2670,21 @@ namespace ShopCart.Controllers
                 }
                 else
                 {
-                    List<CategoryMstr> dbCategory = _dbContext.CategoryMstr.ToList();
+                    List<CategoryMstr> dbCategory = _dbContext.CategoryMstr.OrderBy(p => p.PCatId).ToList();
                     List<VMCategoryMstr> vMCategories = new List<VMCategoryMstr>();
                     foreach (CategoryMstr cat in dbCategory)
                     {
                         VMCategoryMstr vMCategory = new VMCategoryMstr();
                         vMCategory.Id = cat.Id;
                         vMCategory.PCatId = cat.PCatId;
-                        vMCategory.Name = cat.Name;
+                        if (cat.PCatId == null)
+                        {
+                            vMCategory.Name = cat.Name;
+                        }
+                        else
+                        {
+                            vMCategory.Name = _dbContext.CategoryMstr.Find(cat.PCatId).Name + " -> " + cat.Name;
+                        }
                         vMCategories.Add(vMCategory);
                     }
                     objInput.success = true;
@@ -2126,7 +2903,6 @@ namespace ShopCart.Controllers
                 else
                 {
                     List<CouponMstr> dbCoupon = _dbContext.CouponMstr.ToList();
-
                     objInput.success = true;
                     objInput.message = "Successfully. ";
                     objInput.Data = dbCoupon;
@@ -2791,14 +3567,15 @@ namespace ShopCart.Controllers
                 {
                     List<orderByP> orderByPs = new List<orderByP>();
                     var Order_ByProduct = _dbContext.OrderDetailsTbl.OrderBy(p => p.SubProducatId).GroupBy(p => p.SubProducatId);
-                    
+
 
                     foreach (var gp in Order_ByProduct)
                     {
                         orderByP orderByP = new orderByP();
                         foreach (OrderDetailsTbl item in gp)
                         {
-                            var orderDetailsTbl = _dbContext.OrderDetailsTbl.Where( p => p.Id == item.Id).Select(ss => new {
+                            var orderDetailsTbl = _dbContext.OrderDetailsTbl.Where(p => p.Id == item.Id).Select(ss => new
+                            {
                                 pic = ss.SubProducat.ProductImg.FirstOrDefault().Path,
                                 name = ss.SubProducat.Product.Name,
                                 sku = ss.SubProducat.Product.Sku,
@@ -2819,7 +3596,7 @@ namespace ShopCart.Controllers
                         orderByP.totalAmount = (orderByP.totalCount * orderByP.price);
                         orderByPs.Add(orderByP);
                     }
-                    
+
                     objInput.success = true;
                     objInput.message = "Successfully. ";
                     objInput.Data = orderByPs;
@@ -2863,7 +3640,8 @@ namespace ShopCart.Controllers
                         orderByP orderByP = new orderByP();
                         foreach (OrderDetailsTbl item in gp)
                         {
-                            var orderDetailsTbl = _dbContext.OrderDetailsTbl.Where(p => p.Id == item.Id).Select(ss => new {
+                            var orderDetailsTbl = _dbContext.OrderDetailsTbl.Where(p => p.Id == item.Id).Select(ss => new
+                            {
                                 pic = ss.SubProducat.ProductImg.FirstOrDefault().Path,
                                 name = ss.SubProducat.Product.Name,
                                 sku = ss.SubProducat.Product.Sku,
@@ -3255,7 +4033,7 @@ namespace ShopCart.Controllers
                         Venderfadminone.MobileNumber = dbVenderone.MobileNumber;
                         Venderfadminone.Email = dbVenderone.Email;
 
-                         VenderPaymants ven_paymant = _dbContext.VenderPaymants.Where(p => p.VenderId == dbVenderone.Id).OrderByDescending(p => p.PaymantDate).FirstOrDefault();
+                        VenderPaymants ven_paymant = _dbContext.VenderPaymants.Where(p => p.VenderId == dbVenderone.Id).OrderByDescending(p => p.PaymantDate).FirstOrDefault();
 
                         DateTime lastPdate = default(DateTime);
                         if (ven_paymant != null)
@@ -3266,16 +4044,17 @@ namespace ShopCart.Controllers
                         if (lastPdate != default(DateTime))
                         {
                             Venderfadminone.lastPayDate = lastPdate;
-                            var od = _dbContext.OrderDetailsTbl.Where(p => p.SubProducat.Product.VenderId == dbVenderone.Id && p.Order.CreateDt > lastPdate && p.VenderPaymantStatus == 1).Select(ss => new {
-                                    qty = ss.Qty,
-                                    price = ss.SubProducat.Price,
-                                });
+                            var od = _dbContext.OrderDetailsTbl.Where(p => p.SubProducat.Product.VenderId == dbVenderone.Id && p.Order.CreateDt > lastPdate && p.VenderPaymantStatus == 1).Select(ss => new
+                            {
+                                qty = ss.Qty,
+                                price = ss.SubProducat.Price,
+                            });
                             foreach (var item in od)
                             {
                                 Venderfadminone.PaymantAmount += (decimal)(item.qty * item.price);
                             }
                             DateTime curDate = DateTime.Now.Date.AddDays(-15);
-                            if (Venderfadminone.PaymantAmount > 0 )
+                            if (Venderfadminone.PaymantAmount > 0)
                             {
                                 if (lastPdate > curDate)
                                 {
@@ -3295,12 +4074,13 @@ namespace ShopCart.Controllers
                             {
                                 Venderfadminone.Paymant = 4;
                             }
-                            
+
 
                         }
                         else
                         {
-                            var od = _dbContext.OrderDetailsTbl.Where(p => p.SubProducat.Product.VenderId == dbVenderone.Id && p.VenderPaymantStatus == 1).Select(ss => new {
+                            var od = _dbContext.OrderDetailsTbl.Where(p => p.SubProducat.Product.VenderId == dbVenderone.Id && p.VenderPaymantStatus == 1).Select(ss => new
+                            {
                                 qty = ss.Qty,
                                 price = ss.SubProducat.Price,
                             });
@@ -3334,14 +4114,15 @@ namespace ShopCart.Controllers
                             }
 
                         }
-                        
+
                         VanderBankDetailsTbl bankd = _dbContext.VanderBankDetailsTbl.Where(p => p.VenderId == dbVenderone.Id).FirstOrDefault();
-                        if (bankd != null) { 
-                        Venderfadminone.AccountHolderName = bankd.AccountHolderName;
-                        Venderfadminone.AccountNumber = bankd.AccountNumber;
-                        Venderfadminone.IfscCode = bankd.IfscCode;
-                        Venderfadminone.BankName = bankd.BankName;
-                        Venderfadminone.Branch = bankd.Branch;
+                        if (bankd != null)
+                        {
+                            Venderfadminone.AccountHolderName = bankd.AccountHolderName;
+                            Venderfadminone.AccountNumber = bankd.AccountNumber;
+                            Venderfadminone.IfscCode = bankd.IfscCode;
+                            Venderfadminone.BankName = bankd.BankName;
+                            Venderfadminone.Branch = bankd.Branch;
                         }
                         Venderfadmin.Add(Venderfadminone);
                     }
@@ -3391,7 +4172,7 @@ namespace ShopCart.Controllers
                 objInput.success = true;
                 objInput.message = "Successfully. ";
                 objInput.Data = objVenderPayData;
-                
+
 
             }
             catch (Exception ex)
@@ -3428,7 +4209,8 @@ namespace ShopCart.Controllers
                 }
                 else
                 {
-                    var dbVenderP = _dbContext.VenderPaymants.OrderByDescending(p => p.PaymantDate).Select(ss => new {
+                    var dbVenderP = _dbContext.VenderPaymants.OrderByDescending(p => p.PaymantDate).Select(ss => new
+                    {
                         id = ss.Id,
                         displayBusinessName = ss.Vender.DisplayBusinessName,
                         venderFullName = ss.Vender.VenderFullName,
@@ -3483,7 +4265,7 @@ namespace ShopCart.Controllers
                     vg.seleInUnint += od.Qty;
                 }
 
-                List<OrderDetailsTbl> orederDt = _dbContext.OrderDetailsTbl.Where(p => p.SubProducat.Product.VenderId == venderid && p.OrderSubStatus == 4 ).ToList();
+                List<OrderDetailsTbl> orederDt = _dbContext.OrderDetailsTbl.Where(p => p.SubProducat.Product.VenderId == venderid && p.OrderSubStatus == 4).ToList();
                 List<ReturnTbl> returns = new List<ReturnTbl>();
 
                 foreach (OrderDetailsTbl od in orederDt)
@@ -3503,7 +4285,7 @@ namespace ShopCart.Controllers
                 objInput.success = true;
                 objInput.message = "Successfully. ";
                 objInput.Data = vg;
-                
+
             }
             catch (Exception ex)
             {
@@ -3532,7 +4314,7 @@ namespace ShopCart.Controllers
                     return Unauthorized();
                 }
                 int venderid = GetAuthId();
-                List<VenderPaymants> venderPaymants = _dbContext.VenderPaymants.Where(p => p.VenderId == venderid).ToList(); 
+                List<VenderPaymants> venderPaymants = _dbContext.VenderPaymants.Where(p => p.VenderId == venderid).ToList();
                 if (venderPaymants.Count() <= 0)
                 {
                     objInput.success = false;
@@ -3602,7 +4384,7 @@ namespace ShopCart.Controllers
                     }
                     if (paymentOverView.ntotal > 0)
                     {
-                        if(lastPdate.AddDays(15) < DateTime.Now)
+                        if (lastPdate.AddDays(15) < DateTime.Now)
                         {
                             paymentOverView.nextPay_date = DateTime.Now;
                         }
@@ -3646,9 +4428,9 @@ namespace ShopCart.Controllers
                         paymentOverView.nextPay_date = DateTime.Now.AddDays(15);
                     }
                 }
-                    objInput.success = true;
-                    objInput.message = "Successfully. ";
-                    objInput.Data = paymentOverView;
+                objInput.success = true;
+                objInput.message = "Successfully. ";
+                objInput.Data = paymentOverView;
             }
             catch (Exception ex)
             {
@@ -3698,7 +4480,7 @@ namespace ShopCart.Controllers
                         returnorder.price = sp.Price;
                         returnorder.color = _dbContext.ColoursTbl.Find(sp.ColorId).Name;
                         returnorder.size = _dbContext.SizesTbl.Find(sp.SizeId).Name;
-                        returnorder.username = user.FirstName +" "+ user.LastName;
+                        returnorder.username = user.FirstName + " " + user.LastName;
                         finalreturns.Add(returnorder);
                     }
                 }
@@ -3747,17 +4529,18 @@ namespace ShopCart.Controllers
                 int venderid = GetAuthId();
 
                 //List<OrderDetailsTbl> orders1 = _dbContext.OrderDetailsTbl.Where(p => p.SubProducat.Product.VenderId == venderid).ToList();
-                
+
                 //List<OrderDetailsTbl> orders2 = _dbContext.OrderDetailsTbl.Join(_dbContext.OrderTbl,).Where(p => p.SubProducat.Product.VenderId == venderid).Join().ToList();
 
 
 
 
                 var orders3 = _dbContext.OrderDetailsTbl
-                    .Join(_dbContext.OrderTbl, od => od.OrderId, o => o.Id,(od, o) => new { od, o })
+                    .Join(_dbContext.OrderTbl, od => od.OrderId, o => o.Id, (od, o) => new { od, o })
 
                     .Where(p => p.od.SubProducat.Product.VenderId == venderid)
-                                    .Select(p => new {
+                                    .Select(p => new
+                                    {
                                         p.od.Id,
                                         p.o.OrderIdV,
                                         p.od.SubProducat.Product.Sku,
@@ -3821,7 +4604,8 @@ namespace ShopCart.Controllers
                     foreach (vender_orderget item in objvender_orderget)
                     {
                         OrderDetailsTbl orderDet = _dbContext.OrderDetailsTbl.Find(item.Id);
-                        if(item.OrderSubStatus < 5 ) { 
+                        if (item.OrderSubStatus < 5)
+                        {
                             orderDet.OrderSubStatus = BitConverter.GetBytes(item.OrderSubStatus + 1).First();
                         }
                         OrderTbl order = _dbContext.OrderTbl.Find(orderDet.OrderId);
@@ -3829,7 +4613,7 @@ namespace ShopCart.Controllers
                         var flag = true;
                         foreach (OrderDetailsTbl od in orderDetails)
                         {
-                            if(od.OrderSubStatus != orderDet.OrderSubStatus)
+                            if (od.OrderSubStatus != orderDet.OrderSubStatus)
                             {
                                 flag = false;
                             }
@@ -3949,10 +4733,11 @@ namespace ShopCart.Controllers
                 var stocks = _dbContext.SubProductTbl
                     .Join(_dbContext.ProductMstr, sp => sp.ProductId, p => p.Id, (sp, p) => new { sp, p })
                     .Where(s => s.sp.Product.VenderId == venderid)
-                                    .Select(s => new {
+                                    .Select(s => new
+                                    {
                                         s.sp.Id,
                                         s.p.Sku,
-                                        pname =  s.p.Name,
+                                        pname = s.p.Name,
                                         s.sp.Qty,
                                         cname = s.sp.Color.Name,
                                         sname = s.sp.Size.Name,
@@ -4493,40 +5278,9 @@ namespace ShopCart.Controllers
                     newproduct.CreateDt = DateTime.UtcNow;
                     newproduct.UpdateDt = DateTime.UtcNow;
                     _dbContext.ProductMstr.Add(newproduct);
-                    //_dbContext.SaveChanges();
+                    _dbContext.SaveChanges();
 
 
-                    //foreach (CostSubProduct subProduct in CustProductData.SubProductTbl.ToList())
-                    //{
-                    //    SubProductTbl newsubProduct = new SubProductTbl();
-                    //    newsubProduct.ProductId = newproduct.Id;
-                    //    newsubProduct.SizeId = subProduct.SizeId;
-                    //    newsubProduct.ColorId = subProduct.ColorId;
-                    //    newsubProduct.Price = subProduct.Price;
-                    //    newsubProduct.OfferPrice = subProduct.OfferPrice;
-                    //    newsubProduct.Qty = subProduct.Qty;
-
-                    //    newsubProduct.IsActive = true;
-                    //    newsubProduct.IsDeleted = false;
-                    //    newsubProduct.CreateDt = DateTime.UtcNow;
-                    //    newsubProduct.UpdateDt = DateTime.UtcNow;
-                    //    _dbContext.SubProductTbl.Add(newsubProduct);
-                    //    _dbContext.SaveChanges();
-
-                    //    foreach (CustProductImg pimg in subProduct.ProductImg.ToList())
-                    //    {
-                    //        ProductImg newProImg = new ProductImg();
-                    //        newProImg.SubProducatId = newsubProduct.Id;
-                    //        newProImg.Path = pimg.Path;
-                    //        newProImg.IsActive = true;
-                    //        newProImg.IsDeleted = false;
-                    //        newProImg.CreateDt = DateTime.UtcNow;
-                    //        newProImg.UpdateDt = DateTime.UtcNow;
-                    //        _dbContext.ProductImg.Add(newProImg);
-                    //        _dbContext.SaveChanges();
-                    //    }
-
-                    //}
 
 
                     //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
@@ -4595,29 +5349,29 @@ namespace ShopCart.Controllers
                 _dbContext.SaveChanges();
 
 
-                foreach (CostSubProduct subProduct in CustProductData.SubProductTbl.ToList())
-                {
-                    SubProductTbl newsubProduct = _dbContext.SubProductTbl.Find(subProduct.Id);
-                    newsubProduct.ProductId = newproduct.Id;
-                    newsubProduct.SizeId = subProduct.SizeId;
-                    newsubProduct.ColorId = subProduct.ColorId;
-                    newsubProduct.Price = subProduct.Price;
-                    newsubProduct.OfferPrice = subProduct.OfferPrice;
-                    newsubProduct.Qty = subProduct.Qty;
+                //foreach (CostSubProduct subProduct in CustProductData.SubProductTbl.ToList())
+                //{
+                //    SubProductTbl newsubProduct = _dbContext.SubProductTbl.Find(subProduct.Id);
+                //    newsubProduct.ProductId = newproduct.Id;
+                //    newsubProduct.SizeId = subProduct.SizeId;
+                //    newsubProduct.ColorId = subProduct.ColorId;
+                //    newsubProduct.Price = subProduct.Price;
+                //    newsubProduct.OfferPrice = subProduct.OfferPrice;
+                //    newsubProduct.Qty = subProduct.Qty;
 
-                    newsubProduct.UpdateDt = DateTime.UtcNow;
-                    _dbContext.SaveChanges();
+                //    newsubProduct.UpdateDt = DateTime.UtcNow;
+                //    _dbContext.SaveChanges();
 
-                    foreach (CustProductImg pimg in subProduct.ProductImg.ToList())
-                    {
-                        ProductImg newProImg = _dbContext.ProductImg.Find(pimg.Id);
-                        newProImg.SubProducatId = newsubProduct.Id;
-                        newProImg.Path = pimg.Path;
-                        newProImg.UpdateDt = DateTime.UtcNow;
-                        _dbContext.SaveChanges();
-                    }
+                //    foreach (CustProductImg pimg in subProduct.ProductImg.ToList())
+                //    {
+                //        ProductImg newProImg = _dbContext.ProductImg.Find(pimg.Id);
+                //        newProImg.SubProducatId = newsubProduct.Id;
+                //        newProImg.Path = pimg.Path;
+                //        newProImg.UpdateDt = DateTime.UtcNow;
+                //        _dbContext.SaveChanges();
+                //    }
 
-                }
+                //}
 
 
                 //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
@@ -4740,6 +5494,8 @@ namespace ShopCart.Controllers
                         {
                             subProduct.ProductImg.Add(pimg);
                         }
+                        subProduct.Color = _dbContext.ColoursTbl.Find(subProduct.ColorId);
+                        subProduct.Size = _dbContext.SizesTbl.Find(subProduct.SizeId);
                         newproduct.SubProductTbl.Add(subProduct);
                     }
 
@@ -4787,16 +5543,45 @@ namespace ShopCart.Controllers
                     //(5 * 252 + 4 * 124 + 3 * 40 + 2 * 29 + 1 * 33) / (252 + 124 + 40 + 29 + 33) = 4.11 and change
 
                     List<ProductMstr> productList = _dbContext.ProductMstr.Where(p => p.IsDeleted == false).ToList();
-
-                    foreach (ProductMstr newproduct in productList)
+                    List<CustProduct> sendProduct = new List<CustProduct>();
+                    foreach (ProductMstr newProduct in productList)
                     {
-                        foreach (SubProductTbl subProduct in _dbContext.SubProductTbl.Where(p => p.ProductId == newproduct.Id).ToList())
+                        CustProduct cp = new CustProduct();
+                        cp.CatId = newProduct.CatId;
+                        cp.VenderId = newProduct.VenderId;
+                        cp.Sku = newProduct.Sku;
+                        cp.Name = newProduct.Name;
+                        cp.Description = newProduct.Description;
+                        cp.Tags = newProduct.Tags;
+                        cp.IsReturnable = newProduct.IsReturnable;
+                        cp.ReturnDays = newProduct.ReturnDays;
+                        cp.Policy = newProduct.Policy;
+                        cp.CurrentRating = 0;
+                        cp.RatingCount = 0;
+                        cp.ReviewCount = 0;
+                        cp.UserListing = newProduct.UserListing;
+                        cp.PackWeight = newProduct.PackWeight;
+                        cp.PackLenght = newProduct.PackLenght;
+                        cp.PackBreadth = newProduct.PackBreadth;
+                        cp.PackHeight = newProduct.PackHeight;
+
+                        foreach (SubProductTbl newsubProduct in _dbContext.SubProductTbl.Where(p => p.ProductId == cp.Id).ToList())
                         {
-                            foreach (ProductImg pimg in _dbContext.ProductImg.Where(p => p.SubProducatId == subProduct.Id).ToList())
+                            CostSubProduct csp = new CostSubProduct();
+                            csp.ProductId = newsubProduct.ProductId;
+                            csp.SizeId = newsubProduct.SizeId;
+                            csp.ColorId = newsubProduct.ColorId;
+                            csp.Price = newsubProduct.Price;
+                            csp.OfferPrice = newsubProduct.OfferPrice;
+                            csp.Qty = newsubProduct.Qty;
+                            foreach (ProductImg pimg in _dbContext.ProductImg.Where(p => p.SubProducatId == csp.Id).ToList())
                             {
-                                subProduct.ProductImg.Add(pimg);
+                                CustProductImg cProImg = new CustProductImg();
+                                cProImg.SubProducatId = newsubProduct.Id;
+                                cProImg.Path = pimg.Path;
+                                csp.ProductImg.Add(cProImg);
                             }
-                            newproduct.SubProductTbl.Add(subProduct);
+                            cp.SubProductTbl.Add(csp);
                         }
 
                     }
@@ -4834,11 +5619,7 @@ namespace ShopCart.Controllers
             try
             {
 
-                InputData objInputdd = new InputData();
-                if (!ValidateToken(ref objInputdd))
-                {
-                    return Unauthorized();
-                }
+
                 int venderid = GetAuthId();
                 if (!_dbContext.SubProductTbl.Where(p => p.ProductId == productid).Any())
                 {
@@ -4851,7 +5632,7 @@ namespace ShopCart.Controllers
                     //(5 * 252 + 4 * 124 + 3 * 40 + 2 * 29 + 1 * 33) / (252 + 124 + 40 + 29 + 33) = 4.11 and change
 
 
-                    List<SubProductTbl>subProducts = _dbContext.SubProductTbl.Where(p => p.ProductId == productid).ToList();
+                    List<SubProductTbl> subProducts = _dbContext.SubProductTbl.Where(p => p.ProductId == productid).ToList();
                     foreach (SubProductTbl subProduct in subProducts)
                     {
                         subProduct.Color = _dbContext.ColoursTbl.Find(subProduct.ColorId);
@@ -4886,14 +5667,254 @@ namespace ShopCart.Controllers
         }
 
 
-
-        [HttpGet]
-        [Route("Product/GetAll/{VenderId}")]
-        public dynamic Product_GetAll(int VenderId)
+        [HttpPost]
+        [Route("subProduct/Insert/{productid}")]
+        public dynamic subProduct_Insert([FromBody]CostSubProduct CustsubProductData, int productid)
         {
             InputData objInput = new InputData();
             try
             {
+
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+                int venderid = GetAuthId();
+                if (_dbContext.SubProductTbl.Where(p => p.ProductId == productid && p.SizeId == CustsubProductData.SizeId && p.ColorId == CustsubProductData.ColorId).Any())
+                {
+                    objInput.success = false;
+                    objInput.message = "sub Product Already Exist!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+
+                    SubProductTbl newsubProduct = new SubProductTbl();
+                    newsubProduct.ProductId = productid;
+                    newsubProduct.SizeId = CustsubProductData.SizeId;
+                    newsubProduct.ColorId = CustsubProductData.ColorId;
+                    newsubProduct.Price = CustsubProductData.Price;
+                    newsubProduct.OfferPrice = CustsubProductData.OfferPrice;
+                    newsubProduct.Qty = CustsubProductData.Qty;
+
+                    newsubProduct.IsActive = true;
+                    newsubProduct.IsDeleted = false;
+                    newsubProduct.CreateDt = DateTime.UtcNow;
+                    newsubProduct.UpdateDt = DateTime.UtcNow;
+                    _dbContext.SubProductTbl.Add(newsubProduct);
+
+                    if (CustsubProductData.ProductImg.Count > 0)
+                    {
+                        _dbContext.SaveChanges();
+
+                        foreach (CustProductImg pimg in CustsubProductData.ProductImg.ToList())
+                        {
+
+                            ProductImg newProImg = new ProductImg();
+                            newProImg.SubProducatId = newsubProduct.Id;
+                            newProImg.Path = pimg.Path.Split("/")[1];
+                            newProImg.IsActive = true;
+                            newProImg.IsDeleted = false;
+                            newProImg.CreateDt = DateTime.UtcNow;
+                            newProImg.UpdateDt = DateTime.UtcNow;
+                            _dbContext.ProductImg.Add(newProImg);
+
+                            if (!System.IO.File.Exists(Path.Combine(ImgPath, newProImg.Path)) && newProImg.Path != "")
+                                System.IO.File.Move(Path.Combine(TempPath, newProImg.Path), Path.Combine(ImgPath, newProImg.Path));
+                        }
+
+                        _dbContext.SaveChanges();
+
+                    }
+
+                    //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
+                    //String xToken = objAdminData.Id.ToString() + "#" + objAdminData.UserName + "#" + tomorrow.ToString();
+                    //objInput.AuthToken = Encrypt(xToken);
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = newsubProduct;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+            return Ok(objHttpCommonResponse);
+        }
+
+
+
+        [HttpPost]
+        [Route("subProduct/Edit/{Subproductid}")]
+        public dynamic subProduct_Edit([FromBody]CostSubProduct CustsubProductData, int Subproductid)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+                int venderid = GetAuthId();
+                if (_dbContext.SubProductTbl.Where(p => p.ProductId == CustsubProductData.ProductId && p.SizeId == CustsubProductData.SizeId && p.ColorId == CustsubProductData.ColorId && p.Id != Subproductid).Any())
+                {
+                    objInput.success = false;
+                    objInput.message = "sub Product Already Exist!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+
+                    SubProductTbl newsubProduct = _dbContext.SubProductTbl.Find(Subproductid);
+                    newsubProduct.SizeId = CustsubProductData.SizeId;
+                    newsubProduct.ColorId = CustsubProductData.ColorId;
+                    newsubProduct.Price = CustsubProductData.Price;
+                    newsubProduct.OfferPrice = CustsubProductData.OfferPrice;
+                    newsubProduct.Qty = CustsubProductData.Qty;
+
+                    newsubProduct.UpdateDt = DateTime.UtcNow;
+                    _dbContext.SaveChanges();
+
+                    if (CustsubProductData.ProductImg.Count > 0)
+                    {
+
+                        foreach (CustProductImg pimg in CustsubProductData.ProductImg.ToList())
+                        {
+                            var locate = pimg.Path.Split("/")[0];
+                            var imgname = pimg.Path.Split("/")[1];
+                            if (locate == "temp")
+                            {
+                                if (!System.IO.File.Exists(Path.Combine(ImgPath, imgname)) && pimg.Path != "")
+                                {
+
+                                    ProductImg newProImg = new ProductImg();
+                                    newProImg.SubProducatId = newsubProduct.Id;
+                                    newProImg.Path = imgname;
+                                    newProImg.IsActive = true;
+                                    newProImg.IsDeleted = false;
+                                    newProImg.CreateDt = DateTime.UtcNow;
+                                    newProImg.UpdateDt = DateTime.UtcNow;
+                                    System.IO.File.Move(Path.Combine(TempPath, imgname), Path.Combine(ImgPath, imgname));
+                                    _dbContext.ProductImg.Add(newProImg);
+                                }
+
+                            }
+                            else if (locate == "subproduct")
+                            {
+                                if (!_dbContext.ProductImg.Where(p => p.SubProducatId == Subproductid && p.Path == imgname).Any())
+                                {
+                                    var abc = "abc";
+                                }
+                            }
+                        }
+
+                        _dbContext.SaveChanges();
+
+                    }
+
+                    //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
+                    //String xToken = objAdminData.Id.ToString() + "#" + objAdminData.UserName + "#" + tomorrow.ToString();
+                    //objInput.AuthToken = Encrypt(xToken);
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = newsubProduct;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+            return Ok(objHttpCommonResponse);
+        }
+
+        [HttpPost]
+        [Route("subProduct/productImg/Remove/{Subproductid}")]
+        public dynamic subProduct_IMG_Remove([FromBody]CustProductImg ImagPath, int Subproductid)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                var locate = ImagPath.Path.Split("/")[0];
+                var imgname = ImagPath.Path.Split("/")[1];
+                if (locate == "temp")
+                {
+                    if (System.IO.File.Exists(Path.Combine(TempPath, imgname)) && ImagPath.Path != "")
+                    {
+                        System.IO.File.Delete(Path.Combine(TempPath, imgname));
+                    }
+
+                }
+                else if (locate == "subproduct")
+                {
+                    if (System.IO.File.Exists(Path.Combine(ImgPath, imgname)) && ImagPath.Path != "")
+                    {
+                        ProductImg dimg = _dbContext.ProductImg.Where(p => p.Path == imgname && p.SubProducatId == Subproductid).First();
+                        _dbContext.ProductImg.Remove(dimg);
+                        _dbContext.SaveChanges();
+                        System.IO.File.Delete(Path.Combine(ImgPath, imgname));
+                    }
+                }
+
+
+
+                //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
+                //String xToken = objAdminData.Id.ToString() + "#" + objAdminData.UserName + "#" + tomorrow.ToString();
+                //objInput.AuthToken = Encrypt(xToken);
+                objInput.success = true;
+                objInput.message = "Successfully. ";
+                objInput.Data = ImagPath;
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+            return Ok(objHttpCommonResponse);
+        }
+
+
+
+
+
+        [HttpGet]
+        [Route("Product/GetAll/Vender")]
+        public dynamic Product_GetAll_forVendor()
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+                int VenderId = GetAuthId();
                 if (!_dbContext.ProductMstr.Where(p => p.VenderId == VenderId && p.IsDeleted == false).Any())
                 {
                     objInput.success = false;
@@ -4908,27 +5929,40 @@ namespace ShopCart.Controllers
 
 
                     List<ProductMstr> productList = _dbContext.ProductMstr.Where(p => p.VenderId == VenderId && p.IsDeleted == false).ToList();
-
-                    foreach (ProductMstr newproduct in productList)
+                    List<ProductForVender> sendProList = new List<ProductForVender>();
+                    foreach (ProductMstr newProduct in productList)
                     {
-                        foreach (SubProductTbl subProduct in _dbContext.SubProductTbl.Where(p => p.ProductId == newproduct.Id).ToList())
+                        ProductForVender POV = new ProductForVender();
+                        POV.Id = newProduct.Id;
+                        POV.pic = _dbContext.ProductImg.Where(p => p.SubProducat.Product.Id == newProduct.Id).First().Path;
+                        POV.sku = newProduct.Sku;
+                        POV.name = newProduct.Name;
+                        CategoryMstr cats = _dbContext.CategoryMstr.Find(newProduct.CatId);
+
+                        if (cats.PCatId == null)
                         {
-                            foreach (ProductImg pimg in _dbContext.ProductImg.Where(p => p.SubProducatId == subProduct.Id).ToList())
-                            {
-                                subProduct.ProductImg.Add(pimg);
-                            }
-                            newproduct.SubProductTbl.Add(subProduct);
+                            POV.catname = cats.Name;
                         }
-
+                        else
+                        {
+                            POV.catname = _dbContext.CategoryMstr.Find(cats.PCatId).Name + " -> " + cats.Name;
+                        }
+                        POV.CurrentRating = newProduct.CurrentRating;
+                        POV.UserListing = newProduct.UserListing;
+                        POV.ColoursList = new List<string>();
+                        foreach (SubProductTbl newsubProduct in _dbContext.SubProductTbl.Where(p => p.ProductId == POV.Id).ToList())
+                        {
+                            POV.ColoursList.Add(_dbContext.ColoursTbl.Find(newsubProduct.ColorId).Name);
+                        }
+                        sendProList.Add(POV);
                     }
-
 
                     //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
                     //String xToken = objAdminData.Id.ToString() + "#" + objAdminData.UserName + "#" + tomorrow.ToString();
                     //objInput.AuthToken = Encrypt(xToken);
                     objInput.success = true;
                     objInput.message = "Successfully. ";
-                    objInput.Data = productList;
+                    objInput.Data = sendProList;
                 }
 
             }
@@ -5423,6 +6457,7 @@ namespace ShopCart.Controllers
 
             public int Id { get; set; }
             public int CatId { get; set; }
+            public CategoryMstr Cat { get; set; }
             public int VenderId { get; set; }
             public string Sku { get; set; }
             public string Name { get; set; }
@@ -5447,7 +6482,9 @@ namespace ShopCart.Controllers
             public int Id { get; set; }
             public int ProductId { get; set; }
             public int SizeId { get; set; }
+            public SizesTbl Sizes { get; set; }
             public int ColorId { get; set; }
+            public ColoursTbl Color { get; set; }
             public decimal Price { get; set; }
             public decimal OfferPrice { get; set; }
             public decimal Qty { get; set; }
@@ -5459,6 +6496,7 @@ namespace ShopCart.Controllers
             public int SubProducatId { get; set; }
             public string Path { get; set; }
         }
+
     }
 
 }
