@@ -13,7 +13,7 @@ namespace ShopCart.Models
         }
 
         public int Id { get; set; }
-        public long OrderIdV { get; set; }
+        public string OrderIdV { get; set; }
         public int UserId { get; set; }
         public decimal TotalQty { get; set; }
         public decimal TotalPrice { get; set; }

@@ -102,7 +102,7 @@ namespace ShopCart.Models.VModels
     public class vender_orderget
     {
         public int Id { get; set; }
-        public int OrderIdV { get; set; }
+        public string OrderIdV { get; set; }
         public string Sku { get; set; }
         public string Name { get; set; }
         public int Qty { get; set; }
@@ -122,4 +122,93 @@ namespace ShopCart.Models.VModels
         public bool UserListing { get; set; }
         public List<string> ColoursList { get; set; }
     }
+
+
+    public class CustProduct
+    {
+
+        public int Id { get; set; }
+        public int CatId { get; set; }
+        public CategoryMstr Cat { get; set; }
+        public int VenderId { get; set; }
+        public string Sku { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public string Tags { get; set; }
+        public bool IsReturnable { get; set; }
+        public decimal ReturnDays { get; set; }
+        public string Policy { get; set; }
+        public decimal CurrentRating { get; set; }
+        public int RatingCount { get; set; }
+        public int ReviewCount { get; set; }
+        public bool UserListing { get; set; }
+        public decimal PackWeight { get; set; }
+        public decimal PackLenght { get; set; }
+        public decimal PackBreadth { get; set; }
+        public decimal PackHeight { get; set; }
+
+        public ICollection<CostSubProduct> SubProductTbl { get; set; }
+    }
+    public class CostSubProduct
+    {
+        public int Id { get; set; }
+        public int ProductId { get; set; }
+        public int SizeId { get; set; }
+        public SizesTbl Sizes { get; set; }
+        public int ColorId { get; set; }
+        public ColoursTbl Color { get; set; }
+        public decimal Price { get; set; }
+        public decimal OfferPrice { get; set; }
+        public decimal Qty { get; set; }
+        public ICollection<CustProductImg> ProductImg { get; set; }
+        public CustProduct Product { get; set; }
+    }
+    public class CustProductImg
+    {
+        public int Id { get; set; }
+        public int SubProducatId { get; set; }
+        public string Path { get; set; }
+    }
+    public class CoutOrderTbl
+    {
+        public CoutOrderTbl()
+        {
+            ProductImg = new HashSet<string>();
+        }
+
+        public int Id { get; set; }
+        public string OrderIdV { get; set; }
+        public decimal TotalQty { get; set; }
+        public decimal TotalPrice { get; set; }
+        public byte Status { get; set; }
+        public int PaymentStatus { get; set; }
+        public string PaymentMethod { get; set; }
+        public DateTime CreateDt { get; set; }
+        public string CouponCode { get; set; }
+        public ICollection<string> ProductImg { get; set; }
+    }
+    public class CoutOrderDetails
+    {
+        public CoutOrderDetails()
+        {
+            MyOrders = new HashSet<OrderDetailsTbl>();
+        }
+        public int Id { get; set; }
+        public string OrderIdV { get; set; }
+
+        public decimal TotalQty { get; set; }
+        public decimal TotalPrice { get; set; }
+        public byte Status { get; set; }
+        public int PaymentStatus { get; set; }
+        public string PaymentMethod { get; set; }
+        public DateTime CreateDt { get; set; }
+        public string CouponCode { get; set; }
+
+        public UserMstr User { get; set; }
+        public AddressTbl orderaddresses { get; set; }
+        public ICollection<OrderDetailsTbl> MyOrders { get; set; }
+
+    }
+
+
 }

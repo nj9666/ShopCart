@@ -415,7 +415,11 @@ namespace ShopCart.Models
 
                 entity.Property(e => e.IsDeleted).HasColumnName("is_deleted");
 
-                entity.Property(e => e.OrderIdV).HasColumnName("order_id_v");
+                entity.Property(e => e.OrderIdV)
+                    .IsRequired()
+                    .HasColumnName("order_id_v")
+                    .HasMaxLength(20)
+                    .IsUnicode(false);
 
                 entity.Property(e => e.Status).HasColumnName("status");
 

@@ -14,6 +14,8 @@ using System.Text;
 using System.IO;
 using ShopCart.Models.VModels;
 using System.Net.Http.Headers;
+using MimeKit;
+using MailKit.Net.Smtp;
 
 namespace ShopCart.Controllers
 {
@@ -782,7 +784,7 @@ namespace ShopCart.Controllers
 
 
         #region User Activity Area
-      
+
         //[HttpPost]
         //[Route("Card/Insert")]
         //public dynamic Card_Insert([FromBody]CardsTbl objCardsData)
@@ -1497,7 +1499,7 @@ namespace ShopCart.Controllers
                     objInput.message = "you are not able to this!!";
                     objInput.Data = null;
                 }
-                else if (_dbContext.CartTbl.Where(p => p.Id == CartId && p.UserId == UserId).Any())
+                else if (!_dbContext.CartTbl.Where(p => p.Id == CartId && p.UserId == UserId).Any())
                 {
                     objInput.success = false;
                     objInput.message = "Cart Item is not Exist!!";
@@ -1510,9 +1512,7 @@ namespace ShopCart.Controllers
                     objCartData.UpdateDt = DateTime.UtcNow;
                     _dbContext.SaveChanges();
 
-                    //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
-                    //String xToken = objAdminData.Id.ToString() + "#" + objAdminData.UserName + "#" + tomorrow.ToString();
-                    //objInput.AuthToken = Encrypt(xToken);
+
                     objInput.success = true;
                     objInput.message = "Successfully. ";
                     objInput.Data = objCartData;
@@ -1554,7 +1554,7 @@ namespace ShopCart.Controllers
                     objInput.message = "you are not able to this!!";
                     objInput.Data = null;
                 }
-                else if (_dbContext.CartTbl.Where(p => p.Id == CartId && p.UserId == UserId).Any())
+                else if (!_dbContext.CartTbl.Where(p => p.Id == CartId && p.UserId == UserId).Any())
                 {
                     objInput.success = false;
                     objInput.message = "Cart Item is not Exist!!";
@@ -1853,8 +1853,9 @@ namespace ShopCart.Controllers
                 int UserId = GetAuthId();
 
                 OrderTbl NewOrder = new OrderTbl();
-                NewOrder.OrderIdV = Convert.ToInt64(DateTime.UtcNow.ToString("yyyyMMddHHmmssffff"));
+                NewOrder.OrderIdV = "OD"+DateTime.UtcNow.ToString("yyyyMMddHHmmssffff").ToString();
                 NewOrder.UserId = UserId;
+                decimal discountAmount = 0;
 
                 List<CartTbl> items = _dbContext.CartTbl.Where(p => p.UserId == UserId).ToList();
                 foreach (CartTbl item in items)
@@ -1873,12 +1874,13 @@ namespace ShopCart.Controllers
                 {
                     if (activeCoupon.DiscountType == 1)
                     {
-                        NewOrder.TotalPrice -= Convert.ToDecimal(activeCoupon.DiscountAmount);
+                        discountAmount = Convert.ToDecimal(activeCoupon.DiscountAmount);
+                        NewOrder.TotalPrice -= discountAmount;
                     }
                     else if (activeCoupon.DiscountType == 2)
                     {
-                        var discount = (NewOrder.TotalPrice * Convert.ToDecimal(activeCoupon.DiscountAmount)) / 100;
-                        NewOrder.TotalPrice -= discount;
+                        discountAmount = (NewOrder.TotalPrice * Convert.ToDecimal(activeCoupon.DiscountAmount)) / 100;
+                        NewOrder.TotalPrice -= discountAmount;
                     }
                     NewOrder.CouponCode = activeCoupon.Id;
                 }
@@ -1921,6 +1923,29 @@ namespace ShopCart.Controllers
                 objInput.Data = NewOrder;
 
 
+                UserMstr loguser = _dbContext.UserMstr.Find(UserId);
+                AddressTbl logadd = _dbContext.AddressTbl.Find(AddressId);
+                logadd.City = _dbContext.CityMstr.Find(logadd.CityId);
+                logadd.State = _dbContext.StateMstr.Find(logadd.StateId);
+                logadd.Country = _dbContext.CountryMstr.Find(logadd.CountryId);
+
+                var mailhtml = "<html><head> <style type='text/css'> .mailBody{text-align: center; margin: 0 auto; width: 650px; font-family: 'Open Sans', sans-serif; background-color: #e2e2e2; display: block;}ul{margin: 0; padding: 0;}li{display: inline-block; text-decoration: unset;}a{text-decoration: none;}p{margin: 15px 0;}h5{color: #444; text-align: left; font-weight: 400;}.text-center{text-align: center}.main-bg-light{background-color: #fafafa;}.title{color: #444444; font-size: 22px; font-weight: bold; margin-top: 10px; margin-bottom: 10px; padding-bottom: 0; text-transform: uppercase; display: inline-block; line-height: 1;}table{margin-top: 30px}table.top-0{margin-top: 0;}table.order-detail{border: 1px solid #ddd; border-collapse: collapse;}table.order-detail tr:nth-child(even){border-top: 1px solid #ddd; border-bottom: 1px solid #ddd;}table.order-detail tr:nth-child(odd){border-bottom: 1px solid #ddd;}.pad-left-right-space{border: unset !important;}.pad-left-right-space td{padding: 5px 15px;}.pad-left-right-space td p{margin: 0;}.pad-left-right-space td b{font-size: 15px; font-family: 'Roboto', sans-serif;}.order-detail th{font-size: 16px; padding: 15px; text-align: center; background: #fafafa;}.footer-social-icon tr td img{margin-left: 5px; margin-right: 5px;}</style> </head><body> <table class='mailBody'> <tr><td> <table align='center' border='0' cellpadding='0' cellspacing='0' style='padding: 0 30px;background-color: #fff; -webkit-box-shadow: 0px 0px 14px -4px rgba(0, 0, 0, 0.2705882353);box-shadow: 0px 0px 14px -4px rgba(0, 0, 0, 0.2705882353);width: 100%;'> <tbody> <tr> <td> <table align='left' border='0' cellpadding='0' cellspacing='0' style='text-align: left;' width='100%'> <tr> <td style='text-align: center;'> <img src='https://i.ibb.co/pyw5g1S/delivery.png' alt='delivery' style='margin-bottom: 30px;'> </td></tr><tr> <td> <p style='font-size: 14px;'><b>Hi " + loguser.FirstName + " " + loguser.LastName + ",</b></p><p style='font-size: 14px;'>Order Is Successfully Processsed And Your Order Is On The Way,</p><p style='font-size: 14px;'>Order ID : " + NewOrder.OrderIdV + ",</p></td></tr></table> <table cellpadding='0' cellspacing='0' border='0' align='left' style='width: 100%;margin-top: 10px; margin-bottom: 10px;'> <tbody> <tr> <td style='background-color: #fafafa;border: 1px solid #ddd;padding: 15px;letter-spacing: 0.3px;width: 50%;'> <h5 style='font-size: 16px; font-weight: 600;color: #000; line-height: 16px; padding-bottom: 13px; border-bottom: 1px solid #e6e8eb; letter-spacing: -0.65px; margin-top:0; margin-bottom: 13px;'> Seller Address</h5> <p style='text-align: left;font-weight: normal; font-size: 14px; color: #000000;line-height: 21px; margin-top: 0;'> " + logadd.Line1 + ",<br>" + logadd.Line2 + "<br>" + logadd.Landmark + ", " + logadd.City.Name + " " + logadd.State.Name + " " + logadd.Country.Name + " - " + logadd.Zip + " </p></td></tr></tbody> </table> <table class='order-detail' border='0' cellpadding='0' cellspacing='0' align='left' style='width: 100%; margin-bottom: 50px;'> <tr align='left'> <th>PRODUCT</th> <th style='padding-left: 15px;'>DESCRIPTION</th> <th>QUANTITY</th> <th>PRICE </th> </tr>";
+                foreach (CartTbl Cartitem in items)
+                {
+
+                    SubProductTbl sp = _dbContext.SubProductTbl.Find(Cartitem.SubProducatId);
+                    ProductMstr pro = _dbContext.ProductMstr.Find(sp.ProductId);
+                    sp.Color = _dbContext.ColoursTbl.Find(sp.ColorId);
+                    sp.Size = _dbContext.SizesTbl.Find(sp.SizeId);
+                    var spprice = decimal.Round(sp.Price, 2, MidpointRounding.AwayFromZero);
+
+                    mailhtml += "<tr> <td> <img src='https://i.ibb.co/2NJJdzx/18.jpg' alt='18'  width='80'> </td><td valign='top' style='padding-left: 15px;'> <h5 style='margin-top: 15px;'>" + pro.Name + " </h5> </td><td valign='top' style='padding-left: 15px;'> <h5 style='font-size: 14px; color:#444;margin-top:15px; margin-bottom: 0px;'>Size : <span> " + sp.Size.Name + "</span> </h5> <h5 style='font-size: 14px; color:#444;margin-top: 10px;'>Colour : <span style='height:20px;width:20px;border:1px solid #444;    display: inline-block;vertical-align: middle;background-color:" + sp.Color.Name + "'></span></h5> <h5 style='font-size: 14px; color:#444;margin-top: 10px;'>QTY : <span>" + Cartitem.Qty + "</span></h5> </td><td valign='top' style='padding-left: 15px;'> <h5 style='font-size: 14px; color:#444;margin-top:15px'><b>" + spprice + "</b></h5> </td></tr>";
+                }
+
+                mailhtml += "<tr class='pad-left-right-space '> <td class='m-t-5' colspan='2' align='left'> <p style='font-size: 14px;'>Subtotal : </p></td><td class='m-t-5' colspan='2' align='right'> <b style>" + (NewOrder.TotalPrice + discountAmount) + "</b> </td></tr>" +
+
+                    "<tr class='pad-left-right-space'> <td colspan='2' align='left'> <p style='font-size: 14px;'>Shipping Charge :</p></td><td colspan='2' align='right'> <b>100</b> </td></tr><tr class='pad-left-right-space'> <td colspan='2' align='left'> <p style='font-size: 14px;'>Discount :</p></td><td colspan='2' align='right'> <b> "+ discountAmount + "</b> </td></tr><tr class='pad-left-right-space '> <td class='m-b-5' colspan='2' align='left'> <p style='font-size: 14px;'>Total :</p></td><td class='m-b-5' colspan='2' align='right'> <b>" + (NewOrder.TotalPrice + 100) + "</b> </td></tr></table> </td></tr></tbody> </table> <table class='main-bg-light text-center top-0' align='center' border='0' cellpadding='0' cellspacing='0' width='100%'><tbody> <tr> <td style='padding: 30px;'> <table width='100%'><tr><td> <h4 class='title' style='margin:0;text-align: center;'>Follow us</h4> </td></tr></table><table border='0' cellpadding='0' cellspacing='0' class='footer-social-icon' align='center' class='text-center' style='margin-top:20px;'> <tr> <td> <a href='#'><img src='https://i.ibb.co/QjvxQ9W/facebook.png' alt='facebook'></a> </td><td> <a href='#'><img src='https://i.ibb.co/99xXqMn/youtube.png' alt='youtube'></a> </td><td> <a href='#'><img src='https://i.ibb.co/Z6v2wRZ/twitter.png' alt='twitter'></a> </td><td> <a href='#'><img src='https://i.ibb.co/2K26WcD/gplus.png' alt='gplus'></a> </td><td> <a href='#'><img src='https://i.ibb.co/tMp1rcZ/linkedin.png' alt='linkedin'></a> </td><td> <a href='#'><img src='https://i.ibb.co/GvJtjd0/pinterest.png' alt='pinterest'></a> </td></tr></table> <table style='border-top: 1px solid #ddd; margin: 20px auto 0;'><tr><td></td></tr></table><table border='0' cellpadding='0' cellspacing='0' width='100%' style='margin: 20px auto 0;'> <tr> <td> <a href='#' style='font-size:13px'>Want to change how you receive these emails?</a> </td></tr><tr> <td> <p style='font-size:13px; margin:0;'>2018 - 19 Copy Right by Doorja. powerd by Doorja ShopCart LTD.</p></td></tr><tr> <td> <a href='#' style='font-size:13px; margin:0;text-decoration: underline;'>Unsubscribe</a> </td></tr></table> </td></tr></tbody></table></td></tr></table></body></html>";
+                sendMail(loguser.Email, "Your Order Successfully Placed", mailhtml);
             }
             catch (Exception ex)
             {
@@ -1951,7 +1976,7 @@ namespace ShopCart.Controllers
                 int UserId = GetAuthId();
 
                 OrderTbl NewOrder = new OrderTbl();
-                NewOrder.OrderIdV = Convert.ToInt64(DateTime.UtcNow.ToString("yyyyMMddHHmmssffff"));
+                NewOrder.OrderIdV = "OD" + DateTime.UtcNow.ToString("yyyyMMddHHmmssffff").ToString();
                 NewOrder.UserId = UserId;
 
                 List<CartTbl> items = _dbContext.CartTbl.Where(p => p.UserId == UserId).ToList();
@@ -2002,6 +2027,29 @@ namespace ShopCart.Controllers
                 objInput.message = "Successfully. ";
                 objInput.Data = NewOrder;
 
+                UserMstr loguser = _dbContext.UserMstr.Find(UserId);
+                AddressTbl logadd = _dbContext.AddressTbl.Find(AddressId);
+                logadd.City = _dbContext.CityMstr.Find(logadd.CityId);
+                logadd.State = _dbContext.StateMstr.Find(logadd.StateId);
+                logadd.Country = _dbContext.CountryMstr.Find(logadd.CountryId);
+
+                var mailhtml = "<html><head> <style type='text/css'> .mailBody{text-align: center; margin: 0 auto; width: 650px; font-family: 'Open Sans', sans-serif; background-color: #e2e2e2; display: block;}ul{margin: 0; padding: 0;}li{display: inline-block; text-decoration: unset;}a{text-decoration: none;}p{margin: 15px 0;}h5{color: #444; text-align: left; font-weight: 400;}.text-center{text-align: center}.main-bg-light{background-color: #fafafa;}.title{color: #444444; font-size: 22px; font-weight: bold; margin-top: 10px; margin-bottom: 10px; padding-bottom: 0; text-transform: uppercase; display: inline-block; line-height: 1;}table{margin-top: 30px}table.top-0{margin-top: 0;}table.order-detail{border: 1px solid #ddd; border-collapse: collapse;}table.order-detail tr:nth-child(even){border-top: 1px solid #ddd; border-bottom: 1px solid #ddd;}table.order-detail tr:nth-child(odd){border-bottom: 1px solid #ddd;}.pad-left-right-space{border: unset !important;}.pad-left-right-space td{padding: 5px 15px;}.pad-left-right-space td p{margin: 0;}.pad-left-right-space td b{font-size: 15px; font-family: 'Roboto', sans-serif;}.order-detail th{font-size: 16px; padding: 15px; text-align: center; background: #fafafa;}.footer-social-icon tr td img{margin-left: 5px; margin-right: 5px;}</style> </head><body> <table class='mailBody'> <tr><td> <table align='center' border='0' cellpadding='0' cellspacing='0' style='padding: 0 30px;background-color: #fff; -webkit-box-shadow: 0px 0px 14px -4px rgba(0, 0, 0, 0.2705882353);box-shadow: 0px 0px 14px -4px rgba(0, 0, 0, 0.2705882353);width: 100%;'> <tbody> <tr> <td> <table align='left' border='0' cellpadding='0' cellspacing='0' style='text-align: left;' width='100%'> <tr> <td style='text-align: center;'> <img src='https://i.ibb.co/pyw5g1S/delivery.png' alt='delivery' style='margin-bottom: 30px;'> </td></tr><tr> <td> <p style='font-size: 14px;'><b>Hi " + loguser.FirstName + " " + loguser.LastName + ",</b></p><p style='font-size: 14px;'>Order Is Successfully Processsed And Your Order Is On The Way,</p><p style='font-size: 14px;'>Order ID : " + NewOrder.OrderIdV + ",</p></td></tr></table> <table cellpadding='0' cellspacing='0' border='0' align='left' style='width: 100%;margin-top: 10px; margin-bottom: 10px;'> <tbody> <tr> <td style='background-color: #fafafa;border: 1px solid #ddd;padding: 15px;letter-spacing: 0.3px;width: 50%;'> <h5 style='font-size: 16px; font-weight: 600;color: #000; line-height: 16px; padding-bottom: 13px; border-bottom: 1px solid #e6e8eb; letter-spacing: -0.65px; margin-top:0; margin-bottom: 13px;'> Seller Address</h5> <p style='text-align: left;font-weight: normal; font-size: 14px; color: #000000;line-height: 21px; margin-top: 0;'> " + logadd.Line1 + ",<br>" + logadd.Line2 + "<br>" + logadd.Landmark + ", " + logadd.City.Name + " " + logadd.State.Name + " " + logadd.Country.Name + " - " + logadd.Zip + " </p></td></tr></tbody> </table> <table class='order-detail' border='0' cellpadding='0' cellspacing='0' align='left' style='width: 100%; margin-bottom: 50px;'> <tr align='left'> <th>PRODUCT</th> <th style='padding-left: 15px;'>DESCRIPTION</th> <th>QUANTITY</th> <th>PRICE </th> </tr>";
+                foreach (CartTbl Cartitem in items)
+                {
+
+                    SubProductTbl sp = _dbContext.SubProductTbl.Find(Cartitem.SubProducatId);
+                    ProductMstr pro = _dbContext.ProductMstr.Find(sp.ProductId);
+                    sp.Color = _dbContext.ColoursTbl.Find(sp.ColorId);
+                    sp.Size = _dbContext.SizesTbl.Find(sp.SizeId);
+                    var spprice = decimal.Round(sp.Price, 2, MidpointRounding.AwayFromZero);
+
+                    mailhtml += "<tr> <td> <img src='https://i.ibb.co/2NJJdzx/18.jpg' alt='18'  width='80'> </td><td valign='top' style='padding-left: 15px;'> <h5 style='margin-top: 15px;'>" + pro.Name + " </h5> </td><td valign='top' style='padding-left: 15px;'> <h5 style='font-size: 14px; color:#444;margin-top:15px; margin-bottom: 0px;'>Size : <span> " + sp.Size.Name + "</span> </h5> <h5 style='font-size: 14px; color:#444;margin-top: 10px;'>Colour : <span style='height:20px;width:20px;border:1px solid #444;    display: inline-block;vertical-align: middle;background-color:" + sp.Color.Name + "'></span></h5> <h5 style='font-size: 14px; color:#444;margin-top: 10px;'>QTY : <span>" + Cartitem.Qty + "</span></h5> </td><td valign='top' style='padding-left: 15px;'> <h5 style='font-size: 14px; color:#444;margin-top:15px'><b>" + spprice + "</b></h5> </td></tr>";
+                }
+
+                mailhtml += "<tr class='pad-left-right-space '> <td class='m-t-5' colspan='2' align='left'> <p style='font-size: 14px;'>Subtotal : </p></td><td class='m-t-5' colspan='2' align='right'> <b style>" + (NewOrder.TotalPrice ) + "</b> </td></tr>" +
+
+                    "<tr class='pad-left-right-space'> <td colspan='2' align='left'> <p style='font-size: 14px;'>Shipping Charge :</p></td><td colspan='2' align='right'> <b>100</b> </td></tr><tr class='pad-left-right-space'> <td colspan='2' align='left'> <p style='font-size: 14px;'>Discount :</p></td><td colspan='2' align='right'> <b> 0</b> </td></tr><tr class='pad-left-right-space '> <td class='m-b-5' colspan='2' align='left'> <p style='font-size: 14px;'>Total :</p></td><td class='m-b-5' colspan='2' align='right'> <b>" + (NewOrder.TotalPrice + 100) + "</b> </td></tr></table> </td></tr></tbody> </table> <table class='main-bg-light text-center top-0' align='center' border='0' cellpadding='0' cellspacing='0' width='100%'> <tbody> <tr> <td style='padding: 30px;'> <table width='100%'><tr><td> <h4 class='title' style='margin:0;text-align: center;'>Follow us</h4> </td></tr></table><table border='0' cellpadding='0' cellspacing='0' class='footer-social-icon' align='center' class='text-center' style='margin-top:20px;'> <tr> <td> <a href='#'><img src='https://i.ibb.co/QjvxQ9W/facebook.png' alt='facebook'></a> </td><td> <a href='#'><img src='https://i.ibb.co/99xXqMn/youtube.png' alt='youtube'></a> </td><td> <a href='#'><img src='https://i.ibb.co/Z6v2wRZ/twitter.png' alt='twitter'></a> </td><td> <a href='#'><img src='https://i.ibb.co/2K26WcD/gplus.png' alt='gplus'></a> </td><td> <a href='#'><img src='https://i.ibb.co/tMp1rcZ/linkedin.png' alt='linkedin'></a> </td><td> <a href='#'><img src='https://i.ibb.co/GvJtjd0/pinterest.png' alt='pinterest'></a> </td></tr></table> <table style='border-top: 1px solid #ddd; margin: 20px auto 0;'><tr><td></td></tr></table><table border='0' cellpadding='0' cellspacing='0' width='100%' style='margin: 20px auto 0;'> <tr> <td> <a href='#' style='font-size:13px'>Want to change how you receive these emails?</a> </td></tr><tr> <td> <p style='font-size:13px; margin:0;'>2018 - 19 Copy Right by Doorja. powerd by Doorja ShopCart LTD.</p></td></tr><tr> <td> <a href='#' style='font-size:13px; margin:0;text-decoration: underline;'>Unsubscribe</a> </td></tr></table> </td></tr></tbody></table></td></tr></table></body></html>";
+                sendMail(loguser.Email, "Your Order Successfully Placed", mailhtml);
 
             }
             catch (Exception ex)
@@ -2019,12 +2067,35 @@ namespace ShopCart.Controllers
         }
         [HttpPost]
         [Route("Order/payment")]
-        public dynamic Order_payment([FromBody]PaymentTbl objpamentData)
+        public dynamic Order_payment([FromBody]PaymentTbl objpaymentData)
         {
             InputData objInput = new InputData();
             try
             {
+                OrderTbl order = _dbContext.OrderTbl.Find(objpaymentData.OrderId);
 
+                byte sts = 6;
+                if (objpaymentData.Status == 1)
+                {
+                    sts = 1;
+                }
+
+                order.Status = sts;
+
+                foreach (OrderDetailsTbl odt in _dbContext.OrderDetailsTbl.Where(p => p.OrderId == order.Id))
+                {
+                    odt.OrderSubStatus = sts;
+                }
+                objpaymentData.IsActive = true;
+                objpaymentData.IsDeleted = false;
+                objpaymentData.CreateDt = DateTime.UtcNow;
+                objpaymentData.UpdateDt = DateTime.UtcNow;
+                _dbContext.PaymentTbl.Add(objpaymentData);
+
+                _dbContext.SaveChanges();
+                objInput.success = true;
+                objInput.message = "Successfully. ";
+                objInput.Data = objpaymentData;
             }
             catch (Exception ex)
             {
@@ -2039,9 +2110,12 @@ namespace ShopCart.Controllers
             return Ok(objHttpCommonResponse);
         }
 
+       
+
+
         [HttpGet]
         [Route("Order/Get/{orderid}")]
-        public dynamic order_Get(long orderid)
+        public dynamic order_Get(string orderid)
         {
             InputData objInput = new InputData();
             try
@@ -2063,7 +2137,7 @@ namespace ShopCart.Controllers
                         SubProductTbl sp = _dbContext.SubProductTbl.Find(odt.SubProducatId);
                         sp.ProductImg = _dbContext.ProductImg.Where(p => p.SubProducatId == sp.Id).ToList();
                         sp.Product = _dbContext.ProductMstr.Find(sp.ProductId);
-                        
+
                         odt.SubProducat = sp;
                     }
                     order.User = _dbContext.UserMstr.Find(order.UserId);
@@ -2097,6 +2171,215 @@ namespace ShopCart.Controllers
             return Ok(objHttpCommonResponse);
         }
 
+
+        [HttpGet]
+        [Route("Order/GetAll/ForUser")]
+        public dynamic order_GetAll_User()
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+                int UserId = GetAuthId();
+
+                if (!_dbContext.OrderTbl.Where(p => p.UserId == UserId).Any())
+                {
+                    objInput.success = false;
+                    objInput.message = "order List is Empty!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+
+                    List<OrderTbl> Myorders = _dbContext.OrderTbl.Where(p => p.UserId == UserId).ToList();
+                    List<CoutOrderTbl> MyCostOtrders = new List<CoutOrderTbl>();
+                    foreach (OrderTbl order in Myorders)
+                    {
+                        CoutOrderTbl coutOrderTbl = new CoutOrderTbl();
+
+                        order.OrderDetailsTbl = _dbContext.OrderDetailsTbl.Where(p => p.OrderId == order.Id).ToList();
+                        foreach (OrderDetailsTbl odt in order.OrderDetailsTbl)
+                        {
+                            SubProductTbl sp = _dbContext.SubProductTbl.Find(odt.SubProducatId);
+                            coutOrderTbl.ProductImg.Add(_dbContext.ProductImg.Where(p => p.SubProducatId == sp.Id).FirstOrDefault().Path);
+                        }
+                        order.CouponCodeNavigation = _dbContext.CouponMstr.Find(order.CouponCode);
+                        coutOrderTbl.Id = order.Id;
+                        coutOrderTbl.OrderIdV = order.OrderIdV;
+                        coutOrderTbl.TotalQty = order.TotalQty;
+                        coutOrderTbl.TotalPrice = order.TotalPrice + 100;
+                        coutOrderTbl.Status = order.Status;
+                        coutOrderTbl.CouponCode = order.CouponCodeNavigation?.Name;
+                        coutOrderTbl.CreateDt = order.CreateDt;
+
+
+                        PaymentTbl pay = _dbContext.PaymentTbl.Where(p => p.OrderId == order.Id).FirstOrDefault();
+                        coutOrderTbl.PaymentMethod = pay?.Type;
+
+                        if (pay?.Type == "CC")
+                        {
+                            coutOrderTbl.PaymentMethod = "Credit card";
+                        }
+                        else if (pay?.Type == "DC")
+                        {
+                            coutOrderTbl.PaymentMethod = "Debit card";
+                        }
+                        else if (pay?.Type == "NB")
+                        {
+                            coutOrderTbl.PaymentMethod = "Net banking";
+                        }
+                        else if (pay?.Type == "UPI")
+                        {
+                            coutOrderTbl.PaymentMethod = "UPI";
+                        }
+                        else if (pay?.Type == "PPI")
+                        {
+                            coutOrderTbl.PaymentMethod = "Paytm wallet";
+                        }
+                        else if (pay?.Type == "PAYTMCC")
+                        {
+                            coutOrderTbl.PaymentMethod = "Postpaid";
+                        }
+
+                        coutOrderTbl.PaymentStatus = pay != null ? pay.Status : 0;
+
+
+                        MyCostOtrders.Add(coutOrderTbl);
+                    }
+                    //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
+                    //String xToken = objAdminData.Id.ToString() + "#" + objAdminData.UserName + "#" + tomorrow.ToString();
+                    //objInput.AuthToken = Encrypt(xToken);
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = MyCostOtrders;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+            return Ok(objHttpCommonResponse);
+        }
+
+
+        [HttpGet]
+        [Route("Order/GetForOD/{orderid}")]
+        public dynamic order_GetForOD(long orderid)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                //orderid = 30825127;
+                if (!_dbContext.OrderTbl.Where(p => p.Id == orderid).Any())
+                {
+                    objInput.success = false;
+                    objInput.message = "order List is Empty!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+
+                    OrderTbl order = _dbContext.OrderTbl.Where(p => p.Id == orderid).FirstOrDefault();                    
+                    order.User = _dbContext.UserMstr.Find(order.UserId);                    
+                    order.CouponCodeNavigation = _dbContext.CouponMstr.Find(order.CouponCode);
+                    order.OrderDetailsTbl = _dbContext.OrderDetailsTbl.Where(p => p.OrderId == order.Id).ToList();
+
+                    CoutOrderDetails coutOrderTbl = new CoutOrderDetails();
+
+                    foreach (OrderDetailsTbl odt in order.OrderDetailsTbl)
+                    {
+                        SubProductTbl sp = _dbContext.SubProductTbl.Find(odt.SubProducatId);
+                        sp.ProductImg = _dbContext.ProductImg.Where(p => p.SubProducatId == sp.Id).ToList();
+                        sp.Color = _dbContext.ColoursTbl.Find(sp.ColorId);
+                        sp.Size = _dbContext.SizesTbl.Find(sp.SizeId);
+                        sp.Product = _dbContext.ProductMstr.Find(sp.ProductId);
+                        sp.Product.Vender = _dbContext.VenderMstr.Find(sp.Product.VenderId);
+                        odt.SubProducat = sp;
+                    }
+                    coutOrderTbl.MyOrders = order.OrderDetailsTbl;
+                    coutOrderTbl.Id = order.Id;
+                    coutOrderTbl.OrderIdV = order.OrderIdV;
+                    coutOrderTbl.TotalQty = order.TotalQty;
+                    coutOrderTbl.TotalPrice = order.TotalPrice + 100;
+                    coutOrderTbl.Status = order.Status;
+                    coutOrderTbl.CouponCode = order.CouponCodeNavigation?.Name;
+                    coutOrderTbl.CreateDt = order.Status < 2 ? order.CreateDt : order.UpdateDt;
+
+                    AddressTbl add = _dbContext.AddressTbl.Find(order.AddressId);
+                    add.City = _dbContext.CityMstr.Find(add.CityId);
+                    add.State = _dbContext.StateMstr.Find(add.StateId);
+                    add.Country = _dbContext.CountryMstr.Find(add.CountryId);
+                    coutOrderTbl.orderaddresses = add;
+
+                    coutOrderTbl.User = _dbContext.UserMstr.Find(order.UserId);
+
+                    PaymentTbl pay = _dbContext.PaymentTbl.Where(p => p.OrderId == order.Id).FirstOrDefault();
+                    coutOrderTbl.PaymentMethod = pay?.Type;
+
+                    if (pay?.Type == "CC")
+                    {
+                        coutOrderTbl.PaymentMethod = "Credit card";
+                    }
+                    else if (pay?.Type == "DC")
+                    {
+                        coutOrderTbl.PaymentMethod = "Debit card";
+                    }
+                    else if (pay?.Type == "NB")
+                    {
+                        coutOrderTbl.PaymentMethod = "Net banking";
+                    }
+                    else if (pay?.Type == "UPI")
+                    {
+                        coutOrderTbl.PaymentMethod = "UPI";
+                    }
+                    else if (pay?.Type == "PPI")
+                    {
+                        coutOrderTbl.PaymentMethod = "Paytm wallet";
+                    }
+                    else if (pay?.Type == "PAYTMCC")
+                    {
+                        coutOrderTbl.PaymentMethod = "Postpaid";
+                    }
+
+                    coutOrderTbl.PaymentStatus = pay != null ? pay.Status : 0;
+
+
+
+
+                    //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
+                    //String xToken = objAdminData.Id.ToString() + "#" + objAdminData.UserName + "#" + tomorrow.ToString();
+                    //objInput.AuthToken = Encrypt(xToken);
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = coutOrderTbl;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+            return Ok(objHttpCommonResponse);
+        }
 
 
         [HttpPost]
@@ -6408,6 +6691,24 @@ namespace ShopCart.Controllers
             return truncatedHash;
         }
 
+        void sendMail(string emailid,string subject,string mailbody)
+        {
+            MimeMessage message = new MimeMessage();
+            MailboxAddress from = new MailboxAddress("Admin", "doorjashopcart@gmail.com");
+            message.From.Add(from);
+            MailboxAddress to = new MailboxAddress(emailid);
+            message.To.Add(to);
+            message.Subject = subject;
+            BodyBuilder bodyBuilder = new BodyBuilder();
+            bodyBuilder.HtmlBody = mailbody;
+            message.Body = bodyBuilder.ToMessageBody();
+            SmtpClient client = new SmtpClient();
+            client.Connect("smtp.gmail.com", 465, true);
+            client.Authenticate("doorjashopcart@gmail.com", "GMnitin1112");
+            client.Send(message);
+            client.Disconnect(true);
+            client.Dispose();
+        }
 
         #endregion
 
@@ -6452,50 +6753,6 @@ namespace ShopCart.Controllers
             public MetaData metadata { get; set; }
         }
 
-        public class CustProduct
-        {
-
-            public int Id { get; set; }
-            public int CatId { get; set; }
-            public CategoryMstr Cat { get; set; }
-            public int VenderId { get; set; }
-            public string Sku { get; set; }
-            public string Name { get; set; }
-            public string Description { get; set; }
-            public string Tags { get; set; }
-            public bool IsReturnable { get; set; }
-            public decimal ReturnDays { get; set; }
-            public string Policy { get; set; }
-            public decimal CurrentRating { get; set; }
-            public int RatingCount { get; set; }
-            public int ReviewCount { get; set; }
-            public bool UserListing { get; set; }
-            public decimal PackWeight { get; set; }
-            public decimal PackLenght { get; set; }
-            public decimal PackBreadth { get; set; }
-            public decimal PackHeight { get; set; }
-
-            public ICollection<CostSubProduct> SubProductTbl { get; set; }
-        }
-        public class CostSubProduct
-        {
-            public int Id { get; set; }
-            public int ProductId { get; set; }
-            public int SizeId { get; set; }
-            public SizesTbl Sizes { get; set; }
-            public int ColorId { get; set; }
-            public ColoursTbl Color { get; set; }
-            public decimal Price { get; set; }
-            public decimal OfferPrice { get; set; }
-            public decimal Qty { get; set; }
-            public ICollection<CustProductImg> ProductImg { get; set; }
-        }
-        public class CustProductImg
-        {
-            public int Id { get; set; }
-            public int SubProducatId { get; set; }
-            public string Path { get; set; }
-        }
 
     }
 
