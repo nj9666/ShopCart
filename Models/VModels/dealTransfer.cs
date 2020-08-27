@@ -209,6 +209,12 @@ namespace ShopCart.Models.VModels
         public ICollection<OrderDetailsTbl> MyOrders { get; set; }
 
     }
+    public class changePass
+    {
+        public string oldpass { get; set; }
+        public string newpass { get; set; }
+        public string cnewpass { get; set; }
+    }
 
 
 }

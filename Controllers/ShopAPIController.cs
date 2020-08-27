@@ -205,7 +205,7 @@ namespace ShopCart.Controllers
 
                     objInput.AuthToken = Encrypt(xToken);
                     objInput.success = true;
-                    objInput.message = "Successfully. ";
+                    objInput.message = "Registration Successful.";
                     objInput.Data = objUserData;
                 }
 
@@ -225,6 +225,48 @@ namespace ShopCart.Controllers
         }
 
         [HttpPost]
+        [Route("User/Forget_pwd")]
+        public dynamic User_Forget_pwd([FromBody]UserMstr objUserData)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                if (!_dbContext.UserMstr.Where(p => p.Email == objUserData.Email).Any())
+                {
+                    objInput.success = false;
+                    objInput.message = "This Email is not register!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+                    UserMstr user =  _dbContext.UserMstr.Where(p => p.Email == objUserData.Email).FirstOrDefault();
+                    var mail_html = "<!DOCTYPE html><html><head><title></title><meta http-equiv='Content-Type' content='text/html; charset=utf-8' /><meta name='viewport' content='width=device-width, initial-scale=1'><meta http-equiv='X-UA-Compatible' content='IE=edge' /><style type='text/css'>@media screen{@font-face{font-family:'Lato';font-style:normal;font-weight:400;src:local('Lato Regular'), local('Lato-Regular'), url(https://fonts.gstatic.com/s/lato/v11/qIIYRU-oROkIk8vfvxw6QvesZW2xOQ-xsNqO47m55DA.woff) format('woff')}@font-face{font-family:'Lato';font-style:normal;font-weight:700;src:local('Lato Bold'), local('Lato-Bold'), url(https://fonts.gstatic.com/s/lato/v11/qdgUG4U09HnJwhYI-uK18wLUuEpTyoUstqEm5AMlJo4.woff) format('woff')}@font-face{font-family:'Lato';font-style:italic;font-weight:400;src:local('Lato Italic'), local('Lato-Italic'), url(https://fonts.gstatic.com/s/lato/v11/RYyZNoeFgb0l7W3Vu1aSWOvvDin1pK8aKteLpeZ5c0A.woff) format('woff')}@font-face{font-family:'Lato';font-style:italic;font-weight:700;src:local('Lato Bold Italic'), local('Lato-BoldItalic'), url(https://fonts.gstatic.com/s/lato/v11/HkF_qI1x_noxlxhrhMQYELO3LdcAZYWl9Si6vvxL-qU.woff) format('woff')}}body,table,td,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}table,td{mso-table-lspace:0pt;mso-table-rspace:0pt}img{-ms-interpolation-mode:bicubic}img{border:0;height:auto;line-height:100%;outline:none;text-decoration:none}table{border-collapse:collapse !important}body{height:100% !important;margin:0 !important;padding:0 !important;width:100% !important}a[x-apple-data-detectors]{color:inherit !important;text-decoration:none !important;font-size:inherit !important;font-family:inherit !important;font-weight:inherit !important;line-height:inherit !important}@media screen and (max-width:600px){h1{font-size:32px !important;line-height:32px !important}}div[style*='margin: 16px 0;']{margin:0 !important}</style></head><body style='background-color: #f4f4f4; margin: 0 !important; padding: 0 !important;'><div style='display: none; font-size: 1px; color: #fefefe; line-height: 1px; font-family: Lato, Helvetica, Arial, sans-serif; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;'> We weren't able to process your latest payment. Mind checking things out?</div><table border='0' cellpadding='0' cellspacing='0' width='100%'><tr><td bgcolor='#ff857a' align='center'><table border='0' cellpadding='0' cellspacing='0' width='100%' style='max-width: 600px;'><tr><td align='center' valign='top' style='padding: 40px 10px 40px 10px;'> <img alt='Logo' src='https://i.ibb.co/n3YRSnw/logo.png' width='auto' style='display: block;width: 100%;max-width: 250px;min-width: 40px;font-family: Lato, Helvetica, Arial, sans-serif;color: #ffffff;font-size: 18px;' border='0'></td></tr></table></td></tr><tr><td bgcolor='#ff857a' align='center' style='padding: 0px 10px 0px 10px;'><table border='0' cellpadding='0' cellspacing='0' width='100%' style='max-width: 600px;'><tr><td bgcolor='#ffffff' align='center' valign='top' style='padding: 40px 20px 20px 20px; border-radius: 4px 4px 0px 0px; color: #111111; font-family: Lato, Helvetica, Arial, sans-serif; font-size: 48px; font-weight: 400; letter-spacing: 4px; line-height: 48px;'><h1 style='font-size: 48px; font-weight: 400; margin: 0;'>Get your Password!</h1></td></tr></table></td></tr><tr><td bgcolor='#f4f4f4' align='center' style='padding: 0px 10px 0px 10px;'><table border='0' cellpadding='0' cellspacing='0' width='100%' style='max-width: 600px;'><tr><td bgcolor='#ffffff' align='left' style='padding: 20px 30px 40px 30px; color: #666666; font-family: Lato, Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 400; line-height: 25px;'><p style='margin: 0;'>This forget password request is sent by your account if the sender is you and everything is good then go and login in Doorja.</p></td></tr><tr><td bgcolor='#fff1ec' align='left' style='padding: 24px 48px; color: #666666; font-family: Lato, Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 400; line-height: 25px; border-radius: 4px; '><p> To keep your account secure, you need to update your password. Use the login credentials to login into Doorja as usual.</p><p style='color: #ff857a;''><b>Your Email : " + user.Email + "<br> Your password: " + user.Password + "</b></p> <a href=' https://localhost:44363/Login/' style='color: #ff857a; text-decoration: underline;'>Login now</a><p> If you think this email was sent in error, please contact our team by phone at +1 (800) 123-4567 or reply to this email directly. Thank you!</p></td></tr><tr><td bgcolor='#ffffff' align='left' style='padding: 30px 20px 30px; color: #666666; font-family: Lato, Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 400; line-height: 25px;'><p style='margin: 0;'>If you have any questions, just reply to this email—we're always happy to help out.</p></td></tr><tr><td bgcolor='#ffffff' align='left' style='padding: 0px 30px 40px 30px; border-radius: 0px 0px 4px 4px; color: #666666; font-family: Lato, Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 400; line-height: 25px;'><p style='margin: 0;'>Cheers,<br>The Doorja Team</p></td></tr></table></td></tr><tr><td bgcolor='#f4f4f4' align='center' style='padding: 30px 10px 0px 10px;'><table border='0' cellpadding='0' cellspacing='0' width='100%' style='max-width: 600px;'><tr><td bgcolor='#fff1ec' align='center' style='padding: 30px 30px 30px 30px; border-radius: 4px 4px 4px 4px; color: #666666; font-family: Lato, Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 400; line-height: 25px;'><h2 style='font-size: 20px; font-weight: 400; color: #111111; margin: 0;'>Need more help?</h2><p style='margin: 0;'><a href='javascript:void(0)' style='color: #ff857a;'>We&rsquo;re here, ready to talk</a></p></td></tr></table></td></tr><tr><td bgcolor='#f4f4f4' align='center' style='padding: 0px 10px 0px 10px;'><table border='0' cellpadding='0' cellspacing='0' width='100%' style='max-width: 600px;'><tr><td bgcolor='#f4f4f4' align='left' style='padding: 30px 30px 30px 30px; color: #666666; font-family: Lato, Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 400; line-height: 18px;'><p style='margin: 0;'> <a href='javascript:void(0)' style='color: #111111; font-weight: 700;'>Dashboard</a> - <a href='javascript:void(0)' style='color: #111111; font-weight: 700;'>Billing</a> - <a href='javascript:void(0)' style='color: #111111; font-weight: 700;'>Help</a></p></td></tr><tr><td bgcolor='#f4f4f4' align='left' style='padding: 0px 30px 30px 30px; color: #666666; font-family: Lato, Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 400; line-height: 18px;'><p style='margin: 0;'>You received this email because we had problems billing your account. If it looks weird, <a href='javascript:void(0)' style='color: #111111; font-weight: 700;'>view it in your browser</a>.</p></td></tr><tr><td bgcolor='#f4f4f4' align='left' style='padding: 0px 30px 30px 30px; color: #666666; font-family: Lato, Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 400; line-height: 18px;'><p style='margin: 0;'>If these emails get annoying, please feel free to <a href='javascript:void(0)' style='color: #111111; font-weight: 700;'>unsubscribe</a>.</p></td></tr><tr><td bgcolor='#f4f4f4' align='left' style='padding: 0px 30px 30px 30px; color: #666666; font-family: Lato, Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 400; line-height: 18px;'><p style='margin: 0;'>Ceej - 1234 Main Street - Anywhere, MA - 56789</p></td></tr></table></td></tr></table></body></html>";
+
+                    sendMail(user.Email, "Your Doorja login credentials", mail_html);
+
+
+                    objInput.success = true;
+                    objInput.message = "We sent you email regarding your login credentials on this mail address \" "+ objUserData.Email+" \".";
+                    objInput.Data = objUserData;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            objHttpCommonResponse.AuthToken = objInput.AuthToken;
+            return Ok(objHttpCommonResponse);
+        }
+
+
+        [HttpPost]
         [Route("User/Login")]
         public dynamic User_Login([FromBody]UserMstr objUserData)
         {
@@ -232,20 +274,20 @@ namespace ShopCart.Controllers
             try
             {
                 List<UserMstr> Data = new List<UserMstr>();
-                if (decimal.TryParse(objUserData.UserName, out _))
+                if (decimal.TryParse(objUserData.Email, out _))
                 {
-                    Data = _dbContext.UserMstr.Where(p => (p.ContactNumber == Decimal.Parse(objUserData.UserName)) && p.Password == objUserData.Password).ToList();
+                    Data = _dbContext.UserMstr.Where(p => (p.ContactNumber == Decimal.Parse(objUserData.Email)) && p.Password == objUserData.Password).ToList();
                 }
                 else
                 {
-                    Data = _dbContext.UserMstr.Where(p => (p.UserName == objUserData.UserName) && p.Password == objUserData.Password).ToList();
+                    Data = _dbContext.UserMstr.Where(p => (p.Email == objUserData.Email) && p.Password == objUserData.Password).ToList();
                 }
 
 
                 if (Data.Count == 0)
                 {
                     objInput.success = false;
-                    objInput.message = "Incorrect Password.";
+                    objInput.message = "Incorrect Username or Password.";
                     objInput.Data = null;
                 }
                 else
@@ -303,7 +345,7 @@ namespace ShopCart.Controllers
                     objInput.message = "User is Not Exist!!";
                     objInput.Data = null;
                 }
-                else if (_dbContext.UserMstr.Where(p => p.ContactNumber == objUserData.ContactNumber).Any())
+                else if (_dbContext.UserMstr.Where(p => p.ContactNumber == objUserData.ContactNumber && p.Id != UserId).Any())
                 {
                     objInput.success = false;
                     objInput.message = "Phone Number already register!!";
@@ -315,7 +357,7 @@ namespace ShopCart.Controllers
                     dbobjUser.UserName = objUserData.UserName == null ? dbobjUser.UserName : objUserData.UserName;
                     dbobjUser.FirstName = objUserData.FirstName == null ? dbobjUser.FirstName : objUserData.FirstName;
                     dbobjUser.LastName = objUserData.LastName == null ? dbobjUser.LastName : objUserData.LastName;
-                    dbobjUser.Gender = objUserData.Gender == false ? dbobjUser.Gender : objUserData.Gender;
+                    dbobjUser.Gender = objUserData.Gender;
                     dbobjUser.Dob = objUserData.Dob == null ? dbobjUser.Dob : objUserData.Dob;
                     dbobjUser.ContactNumber = objUserData.ContactNumber == 0 ? dbobjUser.ContactNumber : objUserData.ContactNumber;
                     dbobjUser.Email = objUserData.Email == null ? dbobjUser.Email : objUserData.Email;
@@ -328,6 +370,62 @@ namespace ShopCart.Controllers
                     objInput.AuthToken = Encrypt(xToken);
                     objInput.success = true;
                     objInput.message = "Successfully. ";
+                    objInput.Data = dbobjUser;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            objHttpCommonResponse.AuthToken = objInput.AuthToken;
+            return Ok(objHttpCommonResponse);
+        }
+
+        [HttpPost]
+        [Route("User/Changepwd")]
+        public dynamic User_Changepwd([FromBody]changePass objpass)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+                int UserId = GetAuthId();
+                if (!_dbContext.UserMstr.Where(p => p.Id == UserId).Any())
+                {
+                    objInput.success = false;
+                    objInput.message = "User is Not Exist!!";
+                    objInput.Data = null;
+                }
+                else if (!_dbContext.UserMstr.Where(p => p.Id == UserId && p.Password == objpass.oldpass).Any())
+                {
+                    objInput.success = false;
+                    objInput.message = "your Current Password is not match !!";
+                    objInput.Data = null;
+                }
+                else
+                {
+                    UserMstr dbobjUser = _dbContext.UserMstr.Where(p => p.Id == UserId && p.Password == objpass.oldpass).FirstOrDefault();
+
+                    if (dbobjUser != null)
+                    {
+                        dbobjUser.Password = objpass.newpass;
+                        dbobjUser.UpdateDt = DateTime.UtcNow;
+                        _dbContext.SaveChanges();
+                    }
+
+                    objInput.success = true;
+                    objInput.message = "Your password is change successfully. ";
                     objInput.Data = dbobjUser;
                 }
 
@@ -362,6 +460,48 @@ namespace ShopCart.Controllers
                 else
                 {
                     List<UserMstr> dbUser = _dbContext.UserMstr.ToList();
+
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = dbUser;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            return Ok(objHttpCommonResponse);
+        }
+
+        [HttpGet]
+        [Route("User/Get")]
+        public dynamic User_Get()
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+                int UserId = GetAuthId();
+                if (_dbContext.UserMstr.Find(UserId) == null)
+                {
+                    objInput.success = false;
+                    objInput.message = "User is not avalable!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+                    UserMstr dbUser = _dbContext.UserMstr.Find(UserId);
 
                     objInput.success = true;
                     objInput.message = "Successfully. ";
@@ -730,6 +870,7 @@ namespace ShopCart.Controllers
                 List<ProductMstr> products = new List<ProductMstr>();
                 if (_dbContext.CategoryMstr.Find(catid).PCatId == null)
                 {
+                    products = _dbContext.ProductMstr.Where(p => p.SubProductTbl.Count > 0 && p.UserListing && (p.CatId == catid)).OrderByDescending(p => p.CurrentRating).ToList();
                     List<CategoryMstr> categories = _dbContext.CategoryMstr.Where(p => p.PCatId == catid).ToList();
                     foreach (CategoryMstr cat in categories)
                     {
@@ -738,7 +879,7 @@ namespace ShopCart.Controllers
                 }
                 else
                 {
-                    products = _dbContext.ProductMstr.Where(p => p.SubProductTbl.Count > 0 && p.UserListing && p.CatId == catid).OrderByDescending(p => p.CurrentRating).ToList();
+                    products = _dbContext.ProductMstr.Where(p => p.SubProductTbl.Count > 0 && p.UserListing && (p.CatId == catid)).OrderByDescending(p => p.CurrentRating).ToList();
                 }
 
 
@@ -1068,6 +1209,12 @@ namespace ShopCart.Controllers
             InputData objInput = new InputData();
             try
             {
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+                int UserId = GetAuthId();
                 if (false)
                 {
                     objInput.success = false;
@@ -1076,7 +1223,11 @@ namespace ShopCart.Controllers
                 }
                 else
                 {
-
+                    if(!_dbContext.AddressTbl.Where(p => p.UserId == UserId).Any())
+                    {
+                        objAddresssData.IsDefault = true;
+                    }
+                    objAddresssData.UserId = UserId;
                     objAddresssData.IsActive = true;
                     objAddresssData.IsDeleted = false;
                     objAddresssData.CreateDt = DateTime.UtcNow;
@@ -1088,7 +1239,7 @@ namespace ShopCart.Controllers
                     //String xToken = objAddresssData.Id.ToString() + "#" + objAddresssData.UserName + "#" + tomorrow.ToString();
                     //objInput.AuthToken = Encrypt(xToken);
                     objInput.success = true;
-                    objInput.message = "Successfully. ";
+                    objInput.message = "Adress added Successfully. ";
                     objInput.Data = objAddresssData;
                 }
 
@@ -1114,7 +1265,7 @@ namespace ShopCart.Controllers
             InputData objInput = new InputData();
             try
             {
-                if (_dbContext.AddressTbl.Where(p => p.Id == AddressId).Any())
+                if (!_dbContext.AddressTbl.Where(p => p.Id == AddressId).Any())
                 {
                     objInput.success = false;
                     objInput.message = "Addresss is ont Exist!!";
@@ -1164,7 +1315,7 @@ namespace ShopCart.Controllers
             InputData objInput = new InputData();
             try
             {
-                if (_dbContext.AddressTbl.Where(p => p.Id == AddressId).Any())
+                if (!_dbContext.AddressTbl.Where(p => p.Id == AddressId).Any())
                 {
                     objInput.success = false;
                     objInput.message = "Addresss is ont Exist!!";
@@ -1177,13 +1328,14 @@ namespace ShopCart.Controllers
                     objAddresssData.IsActive = false;
                     objAddresssData.IsDeleted = true;
                     objAddresssData.UpdateDt = DateTime.UtcNow;
-                    _dbContext.AddressTbl.Remove(objAddresssData);
+                    _dbContext.SaveChanges();
+
 
                     //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
                     //String xToken = objAddresssData.Id.ToString() + "#" + objAddresssData.UserName + "#" + tomorrow.ToString();
                     //objInput.AuthToken = Encrypt(xToken);
                     objInput.success = true;
-                    objInput.message = "Successfully. ";
+                    objInput.message = "Removed Successfully.";
                     objInput.Data = objAddresssData;
                 }
 
@@ -1359,7 +1511,7 @@ namespace ShopCart.Controllers
                     objInput.message = "you are not able to this!!";
                     objInput.Data = null;
                 }
-                else if (_dbContext.AddressTbl.Where(p => p.Id == AddressId).Any())
+                else if (!_dbContext.AddressTbl.Where(p => p.Id == AddressId).Any())
                 {
                     objInput.success = false;
                     objInput.message = "Addresss is ont Exist!!";
@@ -1726,7 +1878,7 @@ namespace ShopCart.Controllers
         }
 
         [HttpPost]
-        [Route("Wish/Remove/{CartId}")]
+        [Route("Wish/Remove/{WishId}")]
         public dynamic Wish_Remove(int WishId)
         {
             InputData objInput = new InputData();
@@ -1861,7 +2013,9 @@ namespace ShopCart.Controllers
                 foreach (CartTbl item in items)
                 {
                     NewOrder.TotalQty += item.Qty;
-                    NewOrder.TotalPrice += _dbContext.SubProductTbl.Find(item.SubProducatId).Price * item.Qty;
+                    SubProductTbl sp = _dbContext.SubProductTbl.Find(item.SubProducatId);
+                    sp.Qty -= item.Qty;
+                    NewOrder.TotalPrice += (sp.Price * item.Qty);
                     _dbContext.CartTbl.Remove(item);
                 }
                 NewOrder.AddressId = AddressId;
@@ -1983,7 +2137,9 @@ namespace ShopCart.Controllers
                 foreach (CartTbl item in items)
                 {
                     NewOrder.TotalQty += item.Qty;
-                    NewOrder.TotalPrice += _dbContext.SubProductTbl.Find(item.SubProducatId).Price * item.Qty;
+                    SubProductTbl sp = _dbContext.SubProductTbl.Find(item.SubProducatId);
+                    sp.Qty -= item.Qty;
+                    NewOrder.TotalPrice += (sp.Price * item.Qty);
 
                     _dbContext.CartTbl.Remove(item);
                 }
@@ -2065,6 +2221,7 @@ namespace ShopCart.Controllers
             //objHttpCommonResponse.AuthToken = objInput.AuthToken;
             return Ok(objHttpCommonResponse);
         }
+        
         [HttpPost]
         [Route("Order/payment")]
         public dynamic Order_payment([FromBody]PaymentTbl objpaymentData)
@@ -2109,8 +2266,6 @@ namespace ShopCart.Controllers
             //objHttpCommonResponse.AuthToken = objInput.AuthToken;
             return Ok(objHttpCommonResponse);
         }
-
-       
 
 
         [HttpGet]
@@ -2389,6 +2544,13 @@ namespace ShopCart.Controllers
             InputData objInput = new InputData();
             try
             {
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+                int UserId = GetAuthId();
+                objRatingData.UserId = UserId;
                 if (_dbContext.RatingTbl.Where(p => p.ProductId == objRatingData.ProductId && p.UserId == objRatingData.UserId).Any())
                 {
                     objInput.success = false;
@@ -2397,12 +2559,27 @@ namespace ShopCart.Controllers
                 }
                 else
                 {
+                    
+
+
 
                     objRatingData.IsActive = true;
                     objRatingData.IsDeleted = false;
                     objRatingData.CreateDt = DateTime.UtcNow;
                     objRatingData.UpdateDt = DateTime.UtcNow;
                     _dbContext.RatingTbl.Add(objRatingData);
+                    _dbContext.SaveChanges();
+
+                    List<RatingTbl> allrating = _dbContext.RatingTbl.Where(p => p.ProductId == objRatingData.ProductId).ToList();
+                    decimal totalrat = 0;
+                    var totalratcount = allrating.Count;
+                    foreach (RatingTbl rat in allrating)
+                    {
+                        totalrat += rat.Rating;
+                    }
+                    ProductMstr pro = _dbContext.ProductMstr.Find(objRatingData.ProductId);
+                    pro.CurrentRating = totalrat / totalratcount;
+                    pro.RatingCount = totalratcount;
                     _dbContext.SaveChanges();
 
                     //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
@@ -4116,7 +4293,7 @@ namespace ShopCart.Controllers
                 if (Data.Count == 0)
                 {
                     objInput.status = false;
-                    objInput.message = "Email password miss match.";
+                    objInput.message = "Email or password miss match.";
                     objInput.Data = null;
                 }
                 else
@@ -4262,6 +4439,48 @@ namespace ShopCart.Controllers
             InputData objInput = new InputData();
             try
             {
+                if (!_dbContext.VenderMstr.Where(p => p.Id == VenderId).Any())
+                {
+                    objInput.success = false;
+                    objInput.message = "Vender is not avalable!!";
+                    objInput.Data = null;
+                }
+                else
+                {
+                    VenderMstr dbVender = _dbContext.VenderMstr.Find(VenderId);
+
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = dbVender;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            return Ok(objHttpCommonResponse);
+        }
+        [HttpGet]
+        [Route("Vender/GetbyAuth")]
+        public dynamic Vender_GetbyAuth()
+        {
+            InputData objInput = new InputData();
+            try
+            {
+
+                InputData objInputdd = new InputData();
+                if (!ValidateToken(ref objInputdd))
+                {
+                    return Unauthorized();
+                }
+                int VenderId = GetAuthId();
                 if (!_dbContext.VenderMstr.Where(p => p.Id == VenderId).Any())
                 {
                     objInput.success = false;
@@ -4540,7 +4759,7 @@ namespace ShopCart.Controllers
                 VGrowth vg = new VGrowth();
 
                 DateTime lastdate = DateTime.Now.AddDays(-day);
-                List<OrderDetailsTbl> orderDetailsTbls = _dbContext.OrderDetailsTbl.Where(p => p.SubProducat.Product.VenderId == venderid && p.OrderSubStatus == 4 && p.CreateDt > lastdate).ToList();
+                List<OrderDetailsTbl> orderDetailsTbls = _dbContext.OrderDetailsTbl.Where(p => p.SubProducat.Product.VenderId == venderid && p.OrderSubStatus == 5 && p.CreateDt > lastdate).ToList();
 
                 foreach (OrderDetailsTbl od in orderDetailsTbls)
                 {
@@ -4548,7 +4767,7 @@ namespace ShopCart.Controllers
                     vg.seleInUnint += od.Qty;
                 }
 
-                List<OrderDetailsTbl> orederDt = _dbContext.OrderDetailsTbl.Where(p => p.SubProducat.Product.VenderId == venderid && p.OrderSubStatus == 4).ToList();
+                List<OrderDetailsTbl> orederDt = _dbContext.OrderDetailsTbl.Where(p => p.SubProducat.Product.VenderId == venderid && p.OrderSubStatus == 5).ToList();
                 List<ReturnTbl> returns = new List<ReturnTbl>();
 
                 foreach (OrderDetailsTbl od in orederDt)
@@ -5893,6 +6112,60 @@ namespace ShopCart.Controllers
         }
 
 
+        [HttpGet]
+        [Route("Product/Search/{searchText}")]
+        public dynamic Product_Search(string searchText)
+        {
+            InputData objInput = new InputData();
+            try
+            {
+                if (!_dbContext.ProductMstr.Where(p => (p.Name.Contains(searchText) || p.Sku.Contains(searchText) || p.Description.Contains(searchText) || p.Tags.Contains(searchText)) && p.IsDeleted == false && p.SubProductTbl.Count > 0 && p.UserListing).ToList().Any())
+                {
+                    objInput.success = false;
+                    objInput.message = "Product is not Found for \" "+ searchText + " \"!!";
+                    objInput.Data = null;
+                }
+
+                else
+                {
+
+                    //(5 * 252 + 4 * 124 + 3 * 40 + 2 * 29 + 1 * 33) / (252 + 124 + 40 + 29 + 33) = 4.11 and change
+
+                    List<ProductMstr> productList = _dbContext.ProductMstr.Where(p => (p.Name.Contains(searchText) || p.Sku.Contains(searchText) || p.Description.Contains(searchText) || p.Tags.Contains(searchText)) && p.IsDeleted == false && p.SubProductTbl.Count > 0 && p.UserListing).ToList();
+                    foreach (ProductMstr pro in productList)
+                    {
+                        pro.SubProductTbl = _dbContext.SubProductTbl.Where(p => p.ProductId == pro.Id).ToList();
+                        foreach (SubProductTbl subPro in pro.SubProductTbl)
+                        {
+                            subPro.Color = _dbContext.ColoursTbl.Find(subPro.ColorId);
+                            subPro.ProductImg = _dbContext.ProductImg.Where(p => p.SubProducatId == subPro.Id).ToList();
+                        }
+                    }
+
+                    //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
+                    //String xToken = objAdminData.Id.ToString() + "#" + objAdminData.UserName + "#" + tomorrow.ToString();
+                    //objInput.AuthToken = Encrypt(xToken);
+                    objInput.success = true;
+                    objInput.message = "Successfully. ";
+                    objInput.Data = productList;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                objInput.success = false;
+                objInput.message = "Something went wrong, please contact support";
+                objInput.Data = null;
+            }
+
+            objHttpCommonResponse.success = objInput.success;
+            objHttpCommonResponse.message = objInput.message;
+            objHttpCommonResponse.data = objInput.Data;
+            //objHttpCommonResponse.AuthToken = objInput.AuthToken;
+            return Ok(objHttpCommonResponse);
+        }
+
+
 
         [HttpGet]
         [Route("subProduct/Getall/{productid}")]
@@ -6694,7 +6967,7 @@ namespace ShopCart.Controllers
         void sendMail(string emailid,string subject,string mailbody)
         {
             MimeMessage message = new MimeMessage();
-            MailboxAddress from = new MailboxAddress("Admin", "doorjashopcart@gmail.com");
+            MailboxAddress from = new MailboxAddress("Doorja Support Team", "doorjashopcart@gmail.com");
             message.From.Add(from);
             MailboxAddress to = new MailboxAddress(emailid);
             message.To.Add(to);
