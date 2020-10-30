@@ -5969,24 +5969,25 @@ namespace ShopCart.Controllers
                     //(5 * 252 + 4 * 124 + 3 * 40 + 2 * 29 + 1 * 33) / (252 + 124 + 40 + 29 + 33) = 4.11 and change
 
                     ProductMstr newproduct = _dbContext.ProductMstr.Find(ProductId);
-                    _dbContext.ProductMstr.Remove(newproduct);
-                    _dbContext.SaveChanges();
-
-
+                    List<RatingTbl> rat = _dbContext.RatingTbl.Where(p => p.ProductId == ProductId).ToList();
+                    foreach (RatingTbl ra in rat)
+                    {
+                        _dbContext.RatingTbl.Remove(ra);
+                        _dbContext.SaveChanges();
+                    }
                     foreach (SubProductTbl subProduct in _dbContext.SubProductTbl.Where(p => p.ProductId == newproduct.Id).ToList())
                     {
-
-                        _dbContext.SubProductTbl.Remove(subProduct);
-                        _dbContext.SaveChanges();
-
                         foreach (ProductImg pimg in _dbContext.ProductImg.Where(p => p.SubProducatId == subProduct.Id).ToList())
                         {
                             _dbContext.ProductImg.Remove(pimg);
                             _dbContext.SaveChanges();
                         }
+                        _dbContext.SubProductTbl.Remove(subProduct);
+                        _dbContext.SaveChanges();
 
                     }
-
+                    _dbContext.ProductMstr.Remove(newproduct);
+                    _dbContext.SaveChanges();
 
                     //DateTime tomorrow = DateTime.UtcNow.AddHours(24);
                     //String xToken = objAdminData.Id.ToString() + "#" + objAdminData.UserName + "#" + tomorrow.ToString();
